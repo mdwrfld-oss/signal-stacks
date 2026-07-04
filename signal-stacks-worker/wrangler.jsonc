@@ -1,0 +1,19 @@
+{
+  "name": "signal-stacks-worker",
+  "main": "src/index.js",
+  "compatibility_date": "2025-01-01",
+  "triggers": {
+    "crons": ["0 7 * * 1"]
+  },
+  "queues": {
+    "producers": [{ "queue": "signal-stacks-queue", "binding": "SIGNAL_QUEUE" }],
+    "consumers": [{ "queue": "signal-stacks-queue", "max_batch_size": 1 }]
+  },
+  "kv_namespaces": [
+    {
+      "binding": "SIGNAL_KV",
+      "id": "1ac1fc603c7e47319cd6fed6c814c1c7",
+      "remote": true
+    }
+  ]
+}
