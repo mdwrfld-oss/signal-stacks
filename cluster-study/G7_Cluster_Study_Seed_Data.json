@@ -1,0 +1,676 @@
+{
+  "_meta": {
+    "description": "Structured seed data for Cluster Study D3 build. Hub nodes = G7 Tier 1 clients (floor-state: no ring, no relevance decay — these are established relationships, not live signals). Adjacent nodes = competitor/analogous brands identified via manual research bootstrap, pending Signal Stacks maturity.",
+    "confidence_key": {
+      "verified": "Checked against current 2026 sources",
+      "established": "Drawn from stable category knowledge, not independently verified this session — spot-check before using in outreach"
+    },
+    "relationship_types": [
+      "direct_competitor",
+      "analogous_audience",
+      "structurally_analogous_client (corporate_parents level only)"
+    ],
+    "generated": "2026-07-05",
+    "source_doc": "G7_Cluster_Study_Seed_Dataset.md",
+    "new_fields_this_update": [
+      "g7_notes",
+      "coi_sensitive",
+      "coi_note",
+      "structural_analogs"
+    ]
+  },
+  "hub_nodes": [
+    {
+      "id": "white_claw",
+      "name": "White Claw",
+      "category": "Hard seltzer / spiked RTD",
+      "zone": "combo",
+      "confidence": "verified",
+      "adjacent": [
+        {
+          "name": "Truly",
+          "relationship": "direct_competitor",
+          "note": "Category leader but losing share; White Claw now >60% of segment dollar sales"
+        },
+        {
+          "name": "Vizzy",
+          "relationship": "direct_competitor",
+          "note": "Declining; vitamin-C positioning"
+        },
+        {
+          "name": "Bud Light Seltzer",
+          "relationship": "direct_competitor",
+          "note": "Declining sharply"
+        },
+        {
+          "name": "Nütrl",
+          "relationship": "direct_competitor",
+          "note": "Vodka-based, rated well in taste tests"
+        },
+        {
+          "name": "High Noon",
+          "relationship": "direct_competitor",
+          "note": "Vodka seltzer, frequently outperforms White Claw/Truly in taste comparisons"
+        },
+        {
+          "name": "Surfside",
+          "relationship": "analogous_audience",
+          "note": "Non-carbonated spiked drink pulling Gen Z attention from hard seltzer"
+        },
+        {
+          "name": "Sun Cruiser",
+          "relationship": "analogous_audience",
+          "note": "Boston Beer's direct answer to Surfside; growing faster than Surfside currently"
+        }
+      ],
+      "g7_notes": {
+        "case_study_learnings": "Audience is receptive to data capture if incentivized with exclusive experiences or merch. Simpler tactics that ladder to immediate gratification outperform deep concepts and complicated consumer journeys.",
+        "relationship_notes": "Part of the Mark Anthony Brands relationship — G7's warmest client relationship overall. Historically included talent booking; that has recently changed (Experiential only going forward)."
+      }
+    },
+    {
+      "id": "liquid_death",
+      "name": "Liquid Death",
+      "category": "Canned water / edgy-branded beverage, expanding into energy + iced tea",
+      "zone": "experiential",
+      "confidence": "verified",
+      "adjacent": [
+        {
+          "name": "VOSS",
+          "relationship": "direct_competitor",
+          "note": "Premium bottled water"
+        },
+        {
+          "name": "Fiji Water",
+          "relationship": "direct_competitor",
+          "note": "Premium bottled water"
+        },
+        {
+          "name": "Aura Bora",
+          "relationship": "direct_competitor",
+          "note": "Herb/fruit-infused sparkling water"
+        },
+        {
+          "name": "Spindrift",
+          "relationship": "direct_competitor",
+          "note": "Sparkling water, real-fruit positioning"
+        },
+        {
+          "name": "Poland Spring",
+          "relationship": "direct_competitor",
+          "note": "Mass-market bottled water"
+        },
+        {
+          "name": "Monster Energy",
+          "relationship": "analogous_audience",
+          "note": "Liquid Death's expansion into energy drinks makes this newly relevant"
+        },
+        {
+          "name": "Celsius",
+          "relationship": "analogous_audience",
+          "note": "Energy drink category adjacency post-expansion"
+        },
+        {
+          "name": "Alani Nu",
+          "relationship": "analogous_audience",
+          "note": "Energy drink category adjacency post-expansion"
+        }
+      ]
+    },
+    {
+      "id": "fireball_whiskey",
+      "name": "Fireball Whiskey",
+      "category": "Flavored/cinnamon whiskey",
+      "zone": "experiential",
+      "confidence": "verified",
+      "adjacent": [
+        {
+          "name": "Jack Daniel's Fire",
+          "relationship": "direct_competitor",
+          "note": "Major-distillery direct response"
+        },
+        {
+          "name": "Jim Beam Fire",
+          "relationship": "direct_competitor",
+          "note": "Major-distillery direct response"
+        },
+        {
+          "name": "Evan Williams Fire",
+          "relationship": "direct_competitor",
+          "note": "Heaven Hill's cinnamon whiskey entry"
+        },
+        {
+          "name": "Skrewball Peanut Butter Whiskey",
+          "relationship": "analogous_audience",
+          "note": "Different flavor profile, same novelty-shot bar occasion"
+        },
+        {
+          "name": "Ancho Reyes",
+          "relationship": "analogous_audience",
+          "note": "Non-whiskey spiced liqueur, same occasion"
+        },
+        {
+          "name": "Patrón XO Café Incendio",
+          "relationship": "analogous_audience",
+          "note": "Tequila-based spiced liqueur, same occasion"
+        }
+      ]
+    },
+    {
+      "id": "ram_trucks",
+      "name": "Ram Trucks",
+      "category": "Pickup trucks",
+      "zone": "experiential",
+      "confidence": "established",
+      "adjacent": [
+        {
+          "name": "Ford F-150",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "Chevrolet Silverado",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "GMC Sierra",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "Toyota Tundra",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "Yeti",
+          "relationship": "analogous_audience",
+          "note": "Outdoor/rugged-lifestyle audience overlap"
+        },
+        {
+          "name": "Carhartt",
+          "relationship": "analogous_audience",
+          "note": "Rural/workwear-lifestyle audience overlap"
+        }
+      ]
+    },
+    {
+      "id": "turbotax_intuit",
+      "name": "TurboTax / Intuit",
+      "category": "Consumer tax prep / personal finance software",
+      "zone": "combo",
+      "confidence": "established",
+      "adjacent": [
+        {
+          "name": "H&R Block",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "TaxAct",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "TaxSlayer",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "FreeTaxUSA",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "NerdWallet",
+          "relationship": "analogous_audience",
+          "note": "Approachable personal-finance positioning overlap"
+        }
+      ],
+      "g7_notes": {
+        "case_study_learnings": "Consumers must be strongly incentivized to engage. Effective pattern: load the experience with incentives and directly link TurboTax employees with consumers for follow-up after the event. Has partnered with talent on economic-fluency-themed initiatives.",
+        "relationship_notes": "Lapsed — last worked together roughly a year ago, not a current client. G7 has done both Experiential and Talent Booking work for them, at both the TurboTax and Intuit corporate level."
+      }
+    },
+    {
+      "id": "atlassian",
+      "name": "Atlassian",
+      "category": "Enterprise dev/project-management SaaS (Jira, Confluence, Trello)",
+      "zone": "talent",
+      "confidence": "established",
+      "adjacent": [
+        {
+          "name": "Asana",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "Monday.com",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "ClickUp",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "Linear",
+          "relationship": "direct_competitor",
+          "note": "Dev-tool specific"
+        },
+        {
+          "name": "Slack",
+          "relationship": "analogous_audience",
+          "note": "Overlapping modern-team-workflow buyer persona"
+        },
+        {
+          "name": "Notion",
+          "relationship": "analogous_audience",
+          "note": "Overlapping modern-team-workflow buyer persona"
+        }
+      ]
+    },
+    {
+      "id": "subaru",
+      "name": "Subaru",
+      "category": "Automotive, outdoor/adventure-lifestyle positioning",
+      "zone": "experiential",
+      "confidence": "established",
+      "adjacent": [
+        {
+          "name": "Toyota RAV4/4Runner",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "Honda CR-V",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "Jeep Cherokee/Wrangler",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "REI",
+          "relationship": "analogous_audience",
+          "note": "Outdoor-lifestyle audience overlap, longstanding Subaru marketing territory"
+        },
+        {
+          "name": "Patagonia",
+          "relationship": "analogous_audience",
+          "note": "Outdoor-lifestyle audience overlap"
+        },
+        {
+          "name": "Yeti",
+          "relationship": "analogous_audience",
+          "note": "Outdoor-lifestyle audience overlap"
+        }
+      ],
+      "g7_notes": {
+        "case_study_learnings": "Top KPI is hot-lead capture. Secondary goal: impacting the Overlanding space currently dominated by Jeep. Audience is highly loyal, responds well to exclusive programming, and will go out of its way to engage.",
+        "relationship_notes": "Current client. G7 has pitched for additional Experiential business without success, and separately pitched Talent Booking business that also did not close (RFP: Lost, Talent lane) — worth surfacing as a lookalike-search trigger per Section 6."
+      }
+    },
+    {
+      "id": "lagunitas",
+      "name": "Lagunitas",
+      "category": "Craft beer",
+      "zone": "experiential",
+      "confidence": "established",
+      "adjacent": [
+        {
+          "name": "Sierra Nevada",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "Stone Brewing",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "Dogfish Head",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "Founders Brewing",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "Surfside",
+          "relationship": "analogous_audience",
+          "note": "Same category-wide attention shift away from beer/seltzer toward spirits-forward RTDs"
+        }
+      ],
+      "g7_notes": {
+        "case_study_learnings": "A challenging account — core demographic is trending toward reduced alcohol consumption, and the brand is actively pushing against that trend.",
+        "relationship_notes": "A few programs per year. Client-side organization makes long-term planning difficult."
+      }
+    },
+    {
+      "id": "jackson_hole",
+      "name": "Jackson Hole Mountain Resort / Rendezvous",
+      "category": "Ski resort / mountain hospitality",
+      "zone": "combo",
+      "confidence": "established",
+      "adjacent": [
+        {
+          "name": "Vail Resorts",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "Aspen Snowmass",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "Big Sky Resort",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "The North Face",
+          "relationship": "analogous_audience",
+          "note": "Outdoor-adventure lifestyle audience overlap"
+        },
+        {
+          "name": "Yeti",
+          "relationship": "analogous_audience",
+          "note": "Outdoor-adventure lifestyle audience overlap"
+        },
+        {
+          "name": "Patagonia",
+          "relationship": "analogous_audience",
+          "note": "Outdoor-adventure lifestyle audience overlap"
+        }
+      ],
+      "g7_notes": {
+        "case_study_learnings": "G7 manages the Rendezvous Music Festival end-to-end (Experiential + Talent Booking). Attendance has trended down in recent years since the festival shifted from free to paid admission.",
+        "relationship_notes": "Yearly client; work is expected to continue."
+      }
+    },
+    {
+      "id": "workday",
+      "name": "Workday",
+      "category": "Enterprise HR/finance SaaS",
+      "zone": "talent",
+      "confidence": "established",
+      "adjacent": [
+        {
+          "name": "SAP SuccessFactors",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "Oracle Cloud HCM",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "ADP",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "ServiceNow",
+          "relationship": "analogous_audience",
+          "note": "Overlapping enterprise IT/HR leadership buyer persona"
+        },
+        {
+          "name": "Salesforce",
+          "relationship": "analogous_audience",
+          "note": "Overlapping enterprise IT/HR leadership buyer persona"
+        }
+      ]
+    },
+    {
+      "id": "cisco",
+      "name": "Cisco",
+      "category": "Enterprise networking / infrastructure",
+      "zone": "talent",
+      "confidence": "established",
+      "adjacent": [
+        {
+          "name": "Juniper Networks",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "Arista Networks",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "HPE / Aruba Networks",
+          "relationship": "direct_competitor",
+          "note": ""
+        },
+        {
+          "name": "Dell Technologies",
+          "relationship": "analogous_audience",
+          "note": "Overlapping enterprise IT decision-maker audience"
+        },
+        {
+          "name": "VMware",
+          "relationship": "analogous_audience",
+          "note": "Overlapping enterprise IT decision-maker audience"
+        }
+      ]
+    },
+    {
+      "id": "mikes_hard_lemonade",
+      "name": "Mike's Hard Lemonade",
+      "category": "Flavored malt beverage (FMB) / hard lemonade",
+      "zone": "experiential",
+      "confidence": "verified",
+      "g7_notes": {
+        "relationship_notes": "Part of the Mark Anthony Brands family relationship. Assumed Experiential-only per the recent MABI-wide shift away from talent booking — flag if this should differ from White Claw's Combo zone."
+      },
+      "adjacent": [
+        {
+          "name": "Twisted Tea",
+          "relationship": "direct_competitor",
+          "note": "Category-defining rival in flavored malt beverages",
+          "coi_sensitive": true,
+          "coi_note": "MABI is G7's most significant client relationship — direct competitors in this family's core categories should be treated as outreach-cautious, not simply scored and pursued like a standard lookalike."
+        },
+        {
+          "name": "Smirnoff Ice",
+          "relationship": "direct_competitor",
+          "note": "Historic category leader (Diageo)",
+          "coi_sensitive": true,
+          "coi_note": "Same MABI sensitivity as above."
+        }
+      ]
+    },
+    {
+      "id": "cayman_jack",
+      "name": "Cayman Jack",
+      "category": "Ready-to-drink canned margarita / malt-based cocktail",
+      "zone": "experiential",
+      "confidence": "verified",
+      "g7_notes": {
+        "relationship_notes": "Part of the Mark Anthony Brands family relationship. Assumed Experiential-only, same caveat as Mike's Hard Lemonade above."
+      },
+      "adjacent": [
+        {
+          "name": "Jose Cuervo Authentic",
+          "relationship": "direct_competitor",
+          "note": "Major spirits-brand RTD margarita entry",
+          "coi_sensitive": true,
+          "coi_note": "MABI sensitivity — treat as outreach-cautious."
+        },
+        {
+          "name": "1800 Ready-to-Drink",
+          "relationship": "direct_competitor",
+          "note": "Tequila-brand RTD margarita line",
+          "coi_sensitive": true,
+          "coi_note": "MABI sensitivity — treat as outreach-cautious."
+        },
+        {
+          "name": "Cutwater Spirits",
+          "relationship": "direct_competitor",
+          "note": "Craft canned cocktail brand (Anheuser-Busch owned)",
+          "coi_sensitive": true,
+          "coi_note": "MABI sensitivity — treat as outreach-cautious."
+        },
+        {
+          "name": "On The Rocks",
+          "relationship": "direct_competitor",
+          "note": "Premium canned cocktail brand",
+          "coi_sensitive": true,
+          "coi_note": "MABI sensitivity — treat as outreach-cautious."
+        },
+        {
+          "name": "Ritas (Lime-A-Rita)",
+          "relationship": "direct_competitor",
+          "note": "Anheuser-Busch's malt-based margarita entry",
+          "coi_sensitive": true,
+          "coi_note": "MABI sensitivity — treat as outreach-cautious."
+        }
+      ]
+    },
+    {
+      "id": "ole",
+      "name": "Olé Cocktail Co.",
+      "category": "Ready-to-drink tequila cocktail/mocktail",
+      "zone": "experiential",
+      "confidence": "verified",
+      "g7_notes": {
+        "relationship_notes": "Part of the Mark Anthony Brands family relationship. Newest MABI acquisition (acquired 2025, national US expansion launched April 2026) — worth checking with the team on whether G7 already has scoped work here or if this is an emerging opportunity within the existing MABI relationship."
+      },
+      "adjacent": [
+        {
+          "name": "Jose Cuervo Authentic",
+          "relationship": "direct_competitor",
+          "note": "Same RTD tequila-cocktail category as Olé",
+          "coi_sensitive": true,
+          "coi_note": "MABI sensitivity — treat as outreach-cautious."
+        },
+        {
+          "name": "1800 Ready-to-Drink",
+          "relationship": "direct_competitor",
+          "note": "Same category",
+          "coi_sensitive": true,
+          "coi_note": "MABI sensitivity — treat as outreach-cautious."
+        },
+        {
+          "name": "Cutwater Spirits",
+          "relationship": "direct_competitor",
+          "note": "Same category",
+          "coi_sensitive": true,
+          "coi_note": "MABI sensitivity — treat as outreach-cautious."
+        }
+      ]
+    },
+    {
+      "id": "mojo_energy",
+      "name": "Mojo Energy",
+      "category": "Energy drink (Swisher family)",
+      "zone": "experiential",
+      "confidence": "user_provided",
+      "g7_notes": {
+        "relationship_notes": "Existing G7 relationship, child brand under Swisher. Not yet researched for direct competitors/analogs — zone also not yet specified by user.",
+        "category_note": "Caffeine pouches — a new, unconventional product vertical. Direct competitors are vertical-specific (Wip, Ultra, Grinds, NZE); broader energy drink brands (Rockstar, Alani Nu) are analogous-audience rather than direct."
+      },
+      "adjacent": [
+        {
+          "name": "Rockstar",
+          "relationship": "analogous_audience",
+          "note": "Broader energy drink category, overlapping audience"
+        },
+        {
+          "name": "Alani Nu",
+          "relationship": "analogous_audience",
+          "note": "Broader energy drink category, overlapping audience"
+        },
+        {
+          "name": "Wip Energy",
+          "relationship": "direct_competitor",
+          "note": "Caffeine pouch vertical, direct competitor"
+        },
+        {
+          "name": "Ultra",
+          "relationship": "direct_competitor",
+          "note": "Caffeine pouch vertical, direct competitor"
+        },
+        {
+          "name": "Grinds",
+          "relationship": "direct_competitor",
+          "note": "Caffeine pouch vertical, direct competitor"
+        },
+        {
+          "name": "NZE",
+          "relationship": "direct_competitor",
+          "note": "Caffeine pouch vertical, direct competitor"
+        }
+      ]
+    }
+  ],
+  "corporate_parents": [
+    {
+      "id": "mark_anthony_brands",
+      "name": "Mark Anthony Brands, Inc.",
+      "children_existing_hub_nodes": [
+        "white_claw",
+        "mikes_hard_lemonade",
+        "cayman_jack",
+        "ole"
+      ],
+      "children_not_yet_hub_nodes": [],
+      "note": "G7's warmest overall relationship. G7 runs experiential programs for White Claw, Mike's Hard Lemonade, Cayman Jack, Ole, and others under this parent. Talent booking was previously part of the relationship but has recently ended.",
+      "confidence": "user_verified",
+      "flag": "Resolved — Mike's Hard Lemonade, Cayman Jack, and Ole have been promoted to full hub nodes with their own competitor research. Their zone (experiential) is an assumption based on the MABI-wide shift away from talent booking — confirm with the team, since White Claw itself remains zoned Combo.",
+      "other_known_mabi_portfolio_not_confirmed_as_g7_relationships": [
+        "White Claw Surge",
+        "White Claw Zero",
+        "Clawtails",
+        "Más+ (hydration, Messi partnership)"
+      ]
+    },
+    {
+      "id": "intuit",
+      "name": "Intuit",
+      "children_existing_hub_nodes": [
+        "turbotax_intuit"
+      ],
+      "children_not_yet_hub_nodes": [],
+      "related_intuit_properties_not_g7_clients": [
+        "Credit Karma",
+        "Mailchimp",
+        "QuickBooks"
+      ],
+      "note": "G7 has worked with Intuit at the corporate level as well as with TurboTax specifically — both are real G7 relationships, not just a brand/parent naming distinction.",
+      "confidence": "user_verified",
+      "flag": null
+    },
+    {
+      "id": "swisher",
+      "name": "Swisher",
+      "children_existing_hub_nodes": [
+        "mojo_energy"
+      ],
+      "children_not_yet_hub_nodes": [],
+      "note": "G7 works with Mojo Energy, a Swisher child brand. Swisher has a variety of other children not yet detailed.",
+      "confidence": "user_provided",
+      "flag": "Swisher's other child brands are not yet identified — worth a follow-up pass once there's time, similar to how the MABI family was expanded above."
+    }
+  ],
+  "structural_analogs": [
+    {
+      "pair": [
+        "mark_anthony_brands",
+        "swisher"
+      ],
+      "relationship": "structurally_analogous_client",
+      "note": "Not competitors and not audience-analogous brands — these are two multi-brand parent clients where G7's work looks similar across children. Useful for understanding how to structure/pitch multi-brand parent relationships, not for lookalike-brand outreach. This is a distinct relationship type from direct_competitor and analogous_audience, tracked at the corporate_parents level rather than between individual hub nodes."
+    }
+  ]
+}

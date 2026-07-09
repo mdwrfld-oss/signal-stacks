@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "cluster-study",
+      "runtimeExecutable": "/Users/Matt.Weiner/.nvm/versions/node/v22.23.1/bin/node",
+      "runtimeArgs": [
+        "cluster-study/node_modules/wrangler/bin/wrangler.js",
+        "dev",
+        "-c",
+        "cluster-study/wrangler.jsonc",
+        "--port",
+        "8787"
+      ],
+      "port": 8787
+    }
+  ]
+}

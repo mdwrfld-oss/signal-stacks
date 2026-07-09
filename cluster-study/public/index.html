@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>G7 Cluster Study</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header id="toolbar">
+    <div id="brand">
+      <span id="brand-mark">G7</span>
+      <span id="brand-title">Cluster Study</span>
+      <span id="source-badge" title="Where the current graph data came from"></span>
+    </div>
+    <div id="lens-toggle" role="group" aria-label="Lens">
+      <button data-lens="all" class="active">All</button>
+      <button data-lens="experiential">Experiential</button>
+      <button data-lens="talent">Talent</button>
+    </div>
+    <div id="controls">
+      <input id="search" list="search-list" placeholder="Search brands…" autocomplete="off" />
+      <datalist id="search-list"></datalist>
+      <button id="reset-view" title="Reset pan and zoom">Reset view</button>
+    </div>
+  </header>
+
+  <main id="stage">
+    <svg id="canvas"></svg>
+
+    <aside id="detail-panel" class="hidden">
+      <button id="panel-close" aria-label="Close">×</button>
+      <div id="panel-content"></div>
+    </aside>
+
+    <div id="legend">
+      <div class="legend-row"><span class="swatch gradient"></span> Relevance (signal × recency decay)</div>
+      <div class="legend-row"><span class="swatch floor"></span> Floor state — no signal yet, research context</div>
+      <div class="legend-row"><span class="swatch ring ring-signal"></span> Signal Stacks detection</div>
+      <div class="legend-row"><span class="swatch ring ring-rfp"></span> RFP-sourced opportunity</div>
+      <div class="legend-row"><span class="swatch ring ring-new"></span> New addition (first week)</div>
+      <div class="legend-row"><span class="swatch hull"></span> Corporate family (parent + children)</div>
+    </div>
+
+    <div id="status">Loading…</div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

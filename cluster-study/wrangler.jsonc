@@ -1,0 +1,19 @@
+{
+  "name": "cluster-study-worker",
+  "main": "src/index.js",
+  "compatibility_date": "2025-01-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "triggers": {
+    "crons": ["30 7 * * *"]
+  },
+  "kv_namespaces": [
+    {
+      "binding": "CLUSTER_KV",
+      "id": "366abe6c402243878e7b1d3b03d4a446",
+      "remote": true
+    }
+  ]
+}
