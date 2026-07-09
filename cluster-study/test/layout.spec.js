@@ -6,6 +6,7 @@ import {
   nearestFreeCell,
   orbitRadius,
   orbitalSlots,
+  radialEscape,
 } from '../public/layout.js';
 
 describe('snap-to-grid (§4c)', () => {
@@ -60,6 +61,23 @@ describe('orbital layout (§6a.1)', () => {
     for (let i = 1; i < angles.length; i++) {
       expect(angles[i] - angles[i - 1]).toBeCloseTo(Math.PI / 2, 6);
     }
+  });
+
+  it('radialEscape pushes an inside point to the boundary along its bearing (§6a.1a)', () => {
+    const out = radialEscape(30, 40, 0, 0, 100); // dist 50, inside r=100
+    expect(Math.hypot(out.x, out.y)).toBeCloseTo(100, 6);
+    // Bearing preserved: (30,40) direction is 3-4-5 → boundary at (60,80).
+    expect(out.x).toBeCloseTo(60, 6);
+    expect(out.y).toBeCloseTo(80, 6);
+  });
+
+  it('radialEscape returns null when already clear', () => {
+    expect(radialEscape(200, 0, 0, 0, 100)).toBeNull();
+    expect(radialEscape(100, 0, 0, 0, 100)).toBeNull(); // exactly on boundary
+  });
+
+  it('radialEscape handles the center-coincident case deterministically', () => {
+    expect(radialEscape(5, 5, 5, 5, 80)).toEqual({ x: 85, y: 5 });
   });
 
   it('keeps children near their settled bearings (least travel)', () => {

@@ -27,7 +27,9 @@ Google Sheet (private, Service Account)          Seed JSON (bundled fallback)
   with snap-to-grid-and-stay on release (§4c — nearest unoccupied cell, persisted
   per-browser; "Reset layout" clears), always-on label bounding-box collision (§4d),
   pan/zoom + reset (§4a), ring/fill/floor grammar with the G7-client purple base
-  (§5/§5a), orbital parent/child families + hop-capped signal propagation (§6a),
+  (§5/§5a), drop shadows on parents + owned clients only (§5b), orbital
+  parent/child families with per-family exclusion zones that keep non-family
+  nodes outside the ring (§6a/§6a.1a), hop-capped signal propagation (§6a.3),
   selection-triggered structural-analog highlight (§6a.7), click-through detail
   panel, search. Pure layout math (grid snapping, orbit slots) lives in
   `public/layout.js`, unit-tested from the Worker suite.

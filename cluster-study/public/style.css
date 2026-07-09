@@ -111,6 +111,8 @@ body { display: flex; flex-direction: column; }
 
 .node { cursor: pointer; }
 .node circle.core { stroke: #fff; stroke-width: 1.5px; }
+/* §5b: parents + owned clients only — adjacent/floor nodes stay flat. */
+.node circle.core.elevated { filter: drop-shadow(0 2px 3px rgba(36, 27, 53, 0.35)); }
 .node.selected circle.core { stroke: var(--text); stroke-width: 2.5px; }
 .node.analog-partner circle.core { stroke: var(--analog-gold); stroke-width: 3px; }
 

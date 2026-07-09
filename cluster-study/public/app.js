@@ -22,7 +22,14 @@ import {
   computeEffectiveRelevance,
   ringsFor,
 } from '/scoring.js';
-import { nearestFreeCell, cellOf, cellKey, orbitRadius, orbitalSlots } from '/layout.js';
+import {
+  nearestFreeCell,
+  cellOf,
+  cellKey,
+  orbitRadius,
+  orbitalSlots,
+  radialEscape,
+} from '/layout.js';
 
 const svg = d3.select('#canvas');
 const statusEl = document.getElementById('status');
@@ -197,11 +204,13 @@ function render(graph) {
         .forceLink(layoutLinks)
         .id((d) => d.id)
         .distance((d) =>
+          // §4e spacing: competitor/audience links lengthened for breathing
+          // room between clusters; parent_of stays locked to the orbit radius.
           d.relationship === 'parent_of'
             ? orbitOf.get(typeof d.target === 'object' ? d.target.id : d.target) || 90
             : d.relationship === 'direct_competitor'
-              ? 75
-              : 100
+              ? 90
+              : 130
         )
         .strength((d) =>
           d.relationship === 'parent_of' ? 0.9 : d.relationship === 'direct_competitor' ? 0.5 : 0.3
@@ -209,9 +218,12 @@ function render(graph) {
     )
     .force(
       'charge',
-      d3.forceManyBody().strength((d) => (d.type === 'hub' ? -320 : d.type === 'parent' ? -260 : -110))
+      // §4e spacing: stronger repulsion on cluster centers (hubs/parents) so
+      // distinct clusters settle with clear whitespace between them.
+      d3.forceManyBody().strength((d) => (d.type === 'hub' ? -520 : d.type === 'parent' ? -450 : -140))
     )
     .force('collide', d3.forceCollide((d) => d.r + 8))
+    .force('orbitExclusion', forceOrbitExclusion(families))
     .force('labelCollide', forceLabelCollide())
     .force('x', d3.forceX(width / 2).strength(0.06))
     .force('y', d3.forceY(height / 2).strength(0.06))
@@ -278,9 +290,14 @@ function render(graph) {
   // iterations. During the force settle, a free node squeezed between pinned
   // orbit boxes and its own link tension can oscillate instead of escaping —
   // with the opposing forces silenced, boxes separate fully.
+  const relaxExclusion = forceOrbitExclusion(families);
+  relaxExclusion.initialize(graph.nodes);
   const relax = forceLabelCollide();
   relax.initialize(graph.nodes);
-  for (let i = 0; i < 80; i++) relax();
+  for (let i = 0; i < 80; i++) {
+    relaxExclusion();
+    relax();
+  }
 
   for (const n of graph.nodes) {
     if (!n.orbital && !Array.isArray(saved[n.id])) {
@@ -320,6 +337,9 @@ function render(graph) {
   node
     .append('circle')
     .attr('class', 'core')
+    // §5b: shadows lift parents + owned clients off the canvas; adjacent and
+    // floor-state nodes stay flat, reinforcing the §5a purple/gray split.
+    .classed('elevated', (d) => d.is_g7_client || d.type === 'parent')
     .attr('r', (d) => d.r)
     .attr('fill', (d) =>
       d.is_g7_client
@@ -492,6 +512,40 @@ function render(graph) {
 
   // Debug hook for force-tuning sessions (harmless in production).
   window.__cluster = { state, simulation };
+}
+
+/* --------------------------------------- orbit exclusion force (6a.1a) */
+
+/**
+ * Each family's orbit disc is an exclusion zone (§6a.1a): a non-family node
+ * sitting inside the ring falsely reads as affiliated with the parent
+ * (Twisted Tea inside the MABI orbit). Treat the orbit as a fixed circular
+ * obstacle — any outside node that strays within it gets pushed radially out
+ * to the boundary. Center follows the parent's LIVE position, so the zone
+ * moves with a dragged parent. One zone per family; pinned nodes (orbit
+ * slots, user placements) are never moved — same rule as label collide.
+ */
+function forceOrbitExclusion(families) {
+  let nodes;
+
+  function force() {
+    for (const fam of families) {
+      const cx = fam.parent.x;
+      const cy = fam.parent.y;
+      const familyIds = new Set([fam.parent.id, ...fam.children.map((c) => c.id)]);
+      for (const n of nodes) {
+        if (n.fx != null || familyIds.has(n.id)) continue;
+        const out = radialEscape(n.x, n.y, cx, cy, fam.radius + n.r + 12);
+        if (out) {
+          n.x = out.x;
+          n.y = out.y;
+        }
+      }
+    }
+  }
+
+  force.initialize = (n) => (nodes = n);
+  return force;
 }
 
 /* ------------------------------------------- label collision force (4d) */

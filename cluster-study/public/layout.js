@@ -49,6 +49,21 @@ export function nearestFreeCell(x, y, occupied, spacing = GRID_SPACING) {
 }
 
 /**
+ * Radial escape from a circular obstacle (§6a.1a orbit exclusion zone).
+ * Returns the nearest point ON the clearance boundary when (x, y) is inside
+ * it, or null when already clear. A point sitting exactly on the center has
+ * no bearing — push it due east so the result is deterministic.
+ */
+export function radialEscape(x, y, cx, cy, clearRadius) {
+  const dx = x - cx;
+  const dy = y - cy;
+  const dist = Math.hypot(dx, dy);
+  if (dist >= clearRadius) return null;
+  if (dist === 0) return { x: cx + clearRadius, y: cy };
+  return { x: cx + (dx / dist) * clearRadius, y: cy + (dy / dist) * clearRadius };
+}
+
+/**
  * Orbit radius for n children around a parent (§6a.1): adjacent slots need
  * enough chord length that label boxes don't collide, and the orbit must
  * clear the parent — including the parent's own label, which is wider than
