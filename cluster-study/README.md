@@ -23,10 +23,14 @@ Google Sheet (private, Service Account)          Seed JSON (bundled fallback)
 - **`/data`** serves the graph from KV; until the Sheet is populated it falls back
   to the bundled `G7_Cluster_Study_Seed_Data.json` (floor-state bootstrap, Plan §11).
   Approved RFP-lookalike nodes (the overlay) are merged in either way.
-- **Frontend** (`public/`): anchored force layout with lens dimming (§4), drag with
-  return-to-home (§4b), pan/zoom + reset (§4a), ring/fill/floor grammar (§5),
-  corporate-family hulls + hop-capped signal propagation (§6a), selection-triggered
-  structural-analog highlight (§6a.7), click-through detail panel, search.
+- **Frontend** (`public/`): anchored force layout with lens dimming (§4), fluid drag
+  with snap-to-grid-and-stay on release (§4c — nearest unoccupied cell, persisted
+  per-browser; "Reset layout" clears), always-on label bounding-box collision (§4d),
+  pan/zoom + reset (§4a), ring/fill/floor grammar with the G7-client purple base
+  (§5/§5a), orbital parent/child families + hop-capped signal propagation (§6a),
+  selection-triggered structural-analog highlight (§6a.7), click-through detail
+  panel, search. Pure layout math (grid snapping, orbit slots) lives in
+  `public/layout.js`, unit-tested from the Worker suite.
 - **Scoring math** is shared: `public/scoring.js` is imported by the Worker bundle
   *and* the browser, so relevance/propagation are computed identically everywhere.
 
@@ -61,6 +65,7 @@ locked by convention, plus an in-Sheet Notes/Instructions tab.
 | `category` | free text | |
 | `zone` | `experiential` \| `talent` \| `combo` | hubs only; drives lens visibility, not position |
 | `parent` | id of corporate parent | implies a `parent_of` link |
+| `is_g7_client` | TRUE/FALSE | §5a: TRUE renders always-purple (relevance darkens the shade); FALSE/blank stays floor-gray until a live signal |
 | `coi_sensitive` | TRUE/FALSE | data-layer flag, surfaces in click-through only (§9 #14) |
 | `notes` | free text | shows in the detail panel |
 | `signal_strength` | 0–1 | with `signal_date` → ring + fill |
@@ -128,10 +133,17 @@ KV namespace `CLUSTER_KV` (`366abe6c402243878e7b1d3b03d4a446`) is bound in
 
 - `half_life_days` (42) in `public/scoring.js` — decay half-life, to be tuned
   against real data (open question #12).
-- `ANCHOR_STRENGTH` (0.22) in `public/app.js` — how firmly nodes return home
-  after a drag.
+- `GRID_SPACING` (72) in `public/layout.js` — the §4c invisible positioning grid.
+- `orbitRadius()` in `public/layout.js` — §6a.1 orbit sizing (min 90; grows with
+  child count via chord spacing and with parent/child label widths).
+- `ANCHOR_STRENGTH` (0.22) in `public/app.js` — pull toward default positions for
+  free nodes. Orbit children and user-placed nodes are pinned instead.
+- Drag semantics (§4b + §4c, resolved with the user): released nodes snap to the
+  nearest free grid cell and STAY, persisted in the browser's localStorage —
+  return-to-home was superseded for manual drags. Dragging a parent moves its
+  whole orbit formation; individually placed children opt out of the formation.
 - Idle drift at rest (§4b) — not implemented; decide once the drag mechanic can
-  be felt. The anchor currently holds nodes still.
+  be felt.
 - Ring for inherited (proximity) signals — open question #13; currently rings are
   reserved for direct signals, propagation shows as fill only.
 - Talent click-through history (§10.4) — placeholder in the panel, gated on the

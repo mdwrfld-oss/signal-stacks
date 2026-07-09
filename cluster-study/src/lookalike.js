@@ -202,6 +202,7 @@ export async function reviewBatch({ id, decisions }, env) {
         category: batch.profile?.ip_category || null,
         zone: null,
         parent: null,
+        is_g7_client: false,
         confidence: candidate.confidence || null,
         g7_notes: {
           relationship_notes: `RFP lookalike (${batch.client_name || 'unknown client'}, ${batch.outcome}). ${candidate.rationale || ''}`,

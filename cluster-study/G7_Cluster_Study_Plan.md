@@ -22,7 +22,6 @@ A visual, interactive network/cluster diagram (style reference: classic epidemio
 - **NBD** — exploration/brainstorming use case, explicitly chosen over live-status-tracking or pitch-tracking uses. Wants a **hub-and-spoke view per client.**
 - **Leadership/SVP** — category coverage + account concentration risk. Wants a **portfolio-wide view** (treemap/bubble-style).
 - **Key finding:** these are two different chart types over the same data, not one chart with filters. The Leadership view additionally requires real revenue/project-volume data per client/category that hasn't been sourced yet (see Section 7). The NBD view does not depend on this and is the more achievable first build.
-- **Phasing (decided in a later planning session):** NBD's hub-and-spoke view is the full scope of the initial build. Leadership's portfolio view is explicitly deferred to a later phase (**"Phase 3"** in team-facing framing) — not designed further or built against until revenue/project-volume data exists. See Section 11, Gate 5.
 
 ## 4. Layout — anchored default positions with lens-based dimming (revised this session)
 
@@ -47,6 +46,12 @@ Inspired directly by Obsidian's graph view. Nodes can be grabbed and dragged to 
 - **Estimated add: 4–7 hours** on top of core mechanics — anchor-force setup/tuning, drag handlers, making hull boundaries (6a.1) and connector lines recompute live during a drag rather than only rendering once, and general smoothness tuning.
 - **Not yet decided:** whether a subtle idle drift (very low-amplitude motion around the home position, distinct from drag) is worth adding for the "alive" feel Obsidian has at rest, or whether the anchor force should hold nodes fully still until actively dragged. Low-cost either way; worth deciding once the core drag mechanic is working and can be felt rather than imagined.
 
+### 4c. Snap-to-grid dragging (added this session, from live-build feedback)
+On release (not mid-drag, to keep movement fluid), a dragged node snaps to the nearest **unoccupied** point on an invisible positioning grid — similar to icon repositioning on a desktop OS. Nearest-point snapping alone isn't sufficient, since it can collide two nodes into the same cell; snap logic needs an occupancy check with fallback to the next-nearest free cell. Grid spacing should be tied to typical node radius/label width so cells are meaningfully spaced apart. Estimated: 2–3 hours.
+
+### 4d. Label and node collision avoidance (added this session, from live-build feedback)
+Distinct from 4c — this needs to be **always-on**, not just a response to manual dragging, since the default auto-generated layout can produce overlapping labels on its own (seen directly in the first build's Cayman Jack/Olé cluster, where competitor labels crowded and overlapped). Requires a dedicated collision force operating on label **bounding boxes**, not just node circles — text is wider than the circle it's attached to, and the existing `forceCollide` on nodes alone won't prevent label overlap. Runs continuously as part of the simulation tick, not as a one-time cleanup pass. Estimated: 3–5 hours, likely the most iteration-heavy piece of this round of refinements.
+
 ## 5. Visual grammar — resolved to a two-state color model (revised this session)
 
 Originally proposed as three-plus color states (recency-fading gray for "aware but thin," green for client status with its own fade, plus the floor state). After working through the philosophical question of what Cluster is *for* (Section 2, principle 6), this collapsed back to two states:
@@ -66,6 +71,13 @@ relevance = signal_strength × recency_decay(days_since_signal)
 Exponential falloff (e.g., halving every N weeks) rather than a hard cutoff — nothing is hidden, just de-emphasized. Half-life parameter still needs tuning against real data (open question, Section 9).
 
 **Value of the floor state:** floor-state nodes (Namco-style pure theoretical analogs, no live signal) are what make a broader "show all plausible brands in the space" view viable — useful for cold outreach or general environmental/category context — without every node needing to justify its presence with a real signal.
+
+### 5a. Client identity marker (added this session, from live-build feedback)
+The first live build rendered every node in floor-gray by default, which surfaced a real gap: a genuine G7 client shouldn't be visually indistinguishable from a random competitor node just because Signal Stacks hasn't detected a live signal about it yet. Resolved: any node that is a **real, confirmed G7 client relationship** gets a base fill of G7 purple — always, regardless of live-signal status — with the existing relevance formula (signal_strength × recency decay) still modulating *shade within that purple family*. Floor-gray is reserved strictly for nodes that are not G7 clients (competitors, analogs, corporate parents that aren't themselves direct clients).
+
+**Confirmed owned-client list (13):** Cayman Jack, Mike's Hard Lemonade, White Claw, Fireball Whiskey, Liquid Death, Mojo Energy, Ram Trucks, Lagunitas, Subaru, Jackson Hole Mountain Resort, Atlassian, Workday, Cisco. TurboTax/Intuit remains floor-gray given its lapsed status. Implemented as `is_g7_client` (boolean) on every hub node in the seed JSON.
+
+**Estimated: 1–2 hours** to wire the rendering rule now that the client list is finalized.
 
 ## 6. RFP tracker as a scoring input (revised this session — no longer a displayed status type)
 
@@ -93,8 +105,14 @@ Prompted by a real case: Pringles (a real G7 relationship) is owned by Kellogg's
 
 **Unifying insight:** this is structurally the same problem as the sister-agency warm-path signal (Flag 1) and conceptually similar to LinkedIn's tiered-connection display — in all three cases, relevance should propagate outward from a known point through real relationship structure, at reduced confidence per hop. Worth treating this as one general **"connection distance"** mechanism rather than three separate features that happen to look similar. Parent/subsidiary corporate structure and sister-agency client relationships are two concrete instances of the same underlying pattern.
 
-### 6a.1 Visual treatment
-Parent entities are **full nodes** (not just labels), since business at one child can plausibly lead to business at the parent or at siblings. A convex-hull-style boundary (standard D3 pattern via `d3.polygonHull()`) can visually group a parent with its children, updating automatically as the force simulation moves nodes — this is a background/grouping layer, not a new per-node channel competing with ring/fill/size.
+### 6a.1 Visual treatment — orbital layout (revised this session, from live-build feedback)
+**Original approach (superseded):** a convex-hull boundary (`d3.polygonHull()`) drawn around a parent and its children. In practice, this produced tangled connector lines and label crowding around the parent (visible directly in the first build's Mark Anthony Brands cluster).
+
+**Revised approach:** children render in an **orbital layout** — fixed angular slots around the parent at a defined radius, similar to a solar-system diagram, rather than a loose blob boundary. This is inherently tidier: each child has a defined "slot" rather than competing for space wherever the force simulation happens to settle it, and it reads more immediately as "these belong to this parent" than a soft boundary does. An optional dashed orbit-path circle can render behind the children for additional visual clarity, echoing the reference diagram style.
+
+**Larger parent node radius:** parent entity nodes (Mark Anthony Brands, Intuit, Swisher) should render at a visibly larger radius than standard hub or adjacent nodes — a simple size-scale rule keyed to node type (parent vs. hub vs. adjacent-brand), reinforcing their role as an organizing structure rather than a peer node.
+
+**Estimated: 4–6 hours** — radial positioning logic to replace the hull, larger-radius scaling rule, optional orbit-path rendering.
 
 ### 6a.2 New edge type
 `parent_of` / `subsidiary_of` — distinct from `direct_competitor` and `analogous_audience`, since it's a structural relationship, not a competitive or audience one.
@@ -135,18 +153,13 @@ Structurally analogous clients (Section 11's `structural_analogs` field — e.g.
 4. **RFP tracker data mapping** — tracker already exists and logs won/lost status; still needs schema mapping into the scoring pipeline (Section 6)
 5. **Parent/subsidiary corporate structure mapping** — new as of Section 6a; needed to populate `parent_of` edges
 
-**Ingestion mechanism (decided in a later planning session):** a dedicated Google Sheet, separate from but structurally similar to Signal Stacks' backbone Sheet — a **Nodes tab** (client/brand name, corporate parent, category, Experiential/Talent/Combo lane, COI flag) and a **Relationships tab** (connected node pairs, relationship/signal type; propagation strength itself is computed algorithmically per Section 6a's hop-capped multiplier, not stored per row). NBD maintains this Sheet directly; schema fields are fixed by convention (locked header row plus an in-Sheet Notes/Instructions tab), not enforced in code. Auth reuses the existing Signal Stacks Service Account, scoped to also read this Sheet. See Section 8 for how this Sheet is consumed (Cron ingestion → KV → serving Worker) — this replaces the live-read-from-Sheet approach originally described there.
-
 ## 8. Platform recommendation
 
-- **Superseded (see note below):** ~~D3.js, hosted free on GitHub Pages, reading live from the same Google Sheet Signal Stacks already uses.~~
-- **Revised primary (decided in a later planning session):** D3.js, but hosted on **Cloudflare Workers** rather than GitHub Pages — `cluster-study/` as a sibling Worker project to `signal-stacks-worker/` in the Signal Stacks repo, following the same architecture already proven out for Signal Stacks and Scout.
-- **Why this changed:** the Sheet this reads from (see Section 7 update below) carries real client relationship data, including COI-sensitive competitor flags (Section 6a/9) — it needs to stay a private, Service-Account-authenticated Sheet, not a "publish to web" public one. A pure static-HTML-fetches-Sheet-directly pattern (GitHub Pages' natural mode) can't hold that auth safely in browser-side code. Cloudflare Workers can, using the same Service Account + Web Crypto JWT pattern Signal Stacks already uses.
-- **Revised architecture:** a Cron-triggered ingestion Worker pulls the Sheet on a schedule, transforms rows into graph JSON, and writes to KV. A separate serving Worker exposes a `/data` endpoint reading from KV. The frontend (D3 + HTML/JS, same visual grammar as designed throughout this doc) fetches from that endpoint rather than embedding data directly — this also satisfies the "no HTML redistribution when data updates" requirement, since NBD edits the Sheet and the next Cron run makes it live for all users automatically.
-- **Alternative considered (still stands):** Streamlit (Python) — rejected primarily due to free-tier cold-start delay for an occasionally-used internal tool.
+- **Primary:** D3.js, hosted free on GitHub Pages, reading live from the same Google Sheet Signal Stacks already uses. Purpose-built for weighted, animated, filterable network diagrams — force-directed layouts, smooth color/position transitions, and toggleable filters are all native.
+- **Alternative considered:** Streamlit (Python) — rejected primarily due to free-tier cold-start delay for an occasionally-used internal tool.
 - User is unfamiliar with D3; Claude would write the code directly. Not a barrier to the recommendation.
-- Ring rendering, lens-based opacity toggling, convex-hull grouping (Section 6a), and the visual grammar above are all standard D3 patterns — confirmed buildable, not theoretical, and unaffected by the hosting change above.
-- **Setup note (revised):** no GitHub Pages step needed. Repo/branch structure, Cloudflare account, and Service Account access were already set up in a later session — see Section 7 update. Claude Code remains the recommended build environment — it can create files directly in the repo, run a local preview server, iterate on the force-layout tuning in a tight loop, and handle git commit/push and Cloudflare Worker deployment end to end, none of which this chat interface can do.
+- Ring rendering, lens-based opacity toggling, convex-hull grouping (Section 6a), and the visual grammar above are all standard D3 patterns — confirmed buildable, not theoretical.
+- **Setup note:** no registration or application download required. D3 loads via CDN `<script>` tag into a self-contained HTML file, consistent with the Scout build pattern. A code editor (e.g., VS Code) and a GitHub account/repo (for GitHub Pages) are the only real prerequisites. Claude Code is the recommended build environment — it can create files directly in the repo, run a local preview server, iterate on the force-layout tuning in a tight loop, and handle git commit/push and GitHub Pages deployment end to end, none of which this chat interface can do.
 
 ## 9. Open design questions
 
@@ -208,12 +221,10 @@ Cluster's real constraint is dependency order, not a calendar date:
 - **Gate 2:** RFP-triggered lookalike pipeline (Section 6) scoped and tested against a handful of real past RFPs.
 - **Gate 2a (new):** Parent/subsidiary mapping (Section 6a) scoped — a smaller, more contained research task than Gate 1's full competitor/analog research, since it only needs ownership relationships, not full competitive landscapes.
 - **Gate 3:** Open questions in Section 9 resolved — several already closed this session (floor color, current/past client status, layout mechanism); remainder are cheap now, expensive to retrofit after nodes are live.
-- **Gate 4:** Build, recommended in Claude Code (Section 8) once Gates 0–3 are sufficiently clear. Rough estimate: 10–16 hours for core D3 mechanics (anchored-position layout + lens dimming, ring/fill/floor grammar) + 4–7 hours for draggable nodes with return-to-home (Section 4b) + 8–12 hours for the RFP lookalike pipeline + additional time, not yet estimated, for the parent/subsidiary hull-grouping and propagation logic (Section 6a) given it's a genuinely new mechanic.
-- **Gate 5 (Phase 3):** Launch NBD view first; Leadership view once revenue data exists.
+- **Gate 4:** Build, recommended in Claude Code (Section 8) once Gates 0–3 are sufficiently clear. **Underway** — first live build complete (screenshot reviewed this session showing the Mark Anthony Brands cluster, ring rendering, and floor-gray nodes working). Rough estimate for remaining work: 10–16 hours for remaining core D3 mechanics + 4–7 hours for draggable nodes with return-to-home (Section 4b) + 8–12 hours for the RFP lookalike pipeline + additional time, not yet estimated, for the parent/subsidiary propagation logic (Section 6a.3–6a.6). **Round 2 refinements from live-build feedback, this session:** 2–3 hrs (snap-to-grid drag, 4c) + 3–5 hrs (label/collision avoidance, 4d) + 1–2 hrs (client identity marker, 5a — **unblocked**, 13-client list finalized) + 4–6 hrs (orbital layout + larger parent nodes, 6a.1) ≈ **10–16 additional hours.**
+- **Gate 5:** Launch NBD view first; Leadership view once revenue data exists.
 
 **Bootstrap rationale:** since Signal Stacks will take time to build up steam, Cluster's node population doesn't need to wait for it — the manual case-study/AI-assisted lane (one of the three original data-entry paths) can run independently now. These become permanent floor-state nodes (Section 5) with no ring or relevance decay; Signal Stacks later lights up rings/fill on top of the same brands as live signals arrive, rather than creating the nodes from scratch.
-
-**Session 1 build scope (decided in a later planning session):** core D3 mechanics (Section 4, anchored layout + lens dimming + ring/fill/floor grammar), draggable nodes with return-to-home (Section 4b), the Sheets ingestion pipeline (Section 7 update / Section 8), NBD's hub-and-spoke view (Section 3), the RFP lookalike pipeline (Section 6, Gate 2), and corporate structure/hull grouping (Section 6a, Gate 2a) are all in scope for the first Claude Code session. Leadership's portfolio view (Phase 3, Gate 5) is explicitly out of scope until revenue data exists.
 
 ---
 

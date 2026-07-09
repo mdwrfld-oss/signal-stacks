@@ -22,6 +22,7 @@ import {
   computeEffectiveRelevance,
   ringsFor,
 } from '/scoring.js';
+import { nearestFreeCell, cellOf, cellKey, orbitRadius, orbitalSlots } from '/layout.js';
 
 const svg = d3.select('#canvas');
 const statusEl = document.getElementById('status');
@@ -33,7 +34,9 @@ const ANCHOR_STRENGTH = 0.22;
 const RING_LABEL_ZOOM = 2.2; // rings separate + labels become viable past here
 const ADJ_LABEL_ZOOM = 0.85;
 
-const RADII = { hub: 16, parent: 13, adjacent: 8 };
+// §6a.1: parents render visibly larger than hubs — they're organizing
+// structure, not peer nodes.
+const RADII = { hub: 16, parent: 24, adjacent: 8 };
 const RING_GAP = 4;
 
 const state = {
@@ -48,7 +51,12 @@ const state = {
   analogPairs: [],
 };
 
+// Non-client fill: light lavender → dark purple by relevance (only once a
+// real live signal exists — otherwise floor-gray).
 const fillScale = d3.interpolateRgb('#e8e0f7', '#3a1d6e');
+// §5a client fill: confirmed G7 clients are ALWAYS purple — the base is a
+// clearly-purple resting shade, and relevance darkens within the family.
+const clientFillScale = d3.interpolateRgb('#8a6cc4', '#26104e');
 
 init().catch((err) => {
   statusEl.textContent = `Failed to load: ${err.message}`;
@@ -81,12 +89,28 @@ function prepare(graph) {
   state.nodesById = new Map(graph.nodes.map((n) => [n.id, n]));
   state.analogPairs = graph.structural_analogs || [];
 
+  // Label metrics via canvas so collision boxes exist before the settle runs
+  // (DOM text can't be measured yet, and hidden labels measure as 0).
+  const measureCtx = document.createElement('canvas').getContext('2d');
+  const FONT_STACK =
+    '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+
   for (const n of graph.nodes) {
     n.r = RADII[n.type] || RADII.adjacent;
     n.rings = ringsFor(n, now, state.config);
     const eff = state.effective.get(n.id);
     n.relevance = eff ? eff.relevance : 0;
     n.floor = !n.signal && !eff;
+
+    // §4d collision box: node circle + ring stack + label, as one AABB.
+    // Text is wider than the circle it hangs from, so the box is label-driven.
+    measureCtx.font = `${n.type === 'adjacent' ? 9 : 11}px ${FONT_STACK}`;
+    n.labelW = measureCtx.measureText(n.name).width;
+    const ringExtent = n.r + RING_GAP * n.rings.length;
+    const labelBottom = ringExtent + 12 + 4; // label baseline (+12) plus descent
+    n.boxHw = Math.max(ringExtent, n.labelW / 2) + 4;
+    n.boxHh = (ringExtent + labelBottom) / 2 + 2;
+    n.boxCy = (labelBottom - ringExtent) / 2; // box center sits below node center
   }
 
   // Lens membership for nodes without their own zone: an adjacent brand or a
@@ -150,6 +174,21 @@ function render(graph) {
   // not a persistent line (Section 6a.7).
   const layoutLinks = graph.links.map((l) => ({ ...l }));
 
+  // §6a.1: families and orbit radii come first so the parent_of link force
+  // and the orbital slots agree on the same distance — otherwise the link
+  // force perpetually drags children off their slots.
+  const families = buildFamilies(graph);
+  const orbitOf = new Map();
+  for (const fam of families) {
+    fam.radius = orbitRadius(
+      fam.children.length,
+      fam.parent.r,
+      d3.max(fam.children, (c) => 2 * c.boxHw),
+      2 * fam.parent.boxHw
+    );
+    for (const child of fam.children) orbitOf.set(child.id, fam.radius);
+  }
+
   const simulation = d3
     .forceSimulation(graph.nodes)
     .force(
@@ -158,7 +197,11 @@ function render(graph) {
         .forceLink(layoutLinks)
         .id((d) => d.id)
         .distance((d) =>
-          d.relationship === 'parent_of' ? 55 : d.relationship === 'direct_competitor' ? 75 : 100
+          d.relationship === 'parent_of'
+            ? orbitOf.get(typeof d.target === 'object' ? d.target.id : d.target) || 90
+            : d.relationship === 'direct_competitor'
+              ? 75
+              : 100
         )
         .strength((d) =>
           d.relationship === 'parent_of' ? 0.9 : d.relationship === 'direct_competitor' ? 0.5 : 0.3
@@ -169,6 +212,7 @@ function render(graph) {
       d3.forceManyBody().strength((d) => (d.type === 'hub' ? -320 : d.type === 'parent' ? -260 : -110))
     )
     .force('collide', d3.forceCollide((d) => d.r + 8))
+    .force('labelCollide', forceLabelCollide())
     .force('x', d3.forceX(width / 2).strength(0.06))
     .force('y', d3.forceY(height / 2).strength(0.06))
     .stop();
@@ -183,24 +227,76 @@ function render(graph) {
     n.homeX = n.x;
     n.homeY = n.y;
   }
-  simulation
-    .force('x', d3.forceX((d) => d.homeX).strength(ANCHOR_STRENGTH))
-    .force('y', d3.forceY((d) => d.homeY).strength(ANCHOR_STRENGTH))
-    .alpha(0);
 
-  /* hulls — one per corporate parent with members (Section 6a.1) */
-  const families = buildFamilies(graph);
-  const hulls = hullLayer
-    .selectAll('path')
+  // §4c persistence: dragged-and-snapped positions survive reloads
+  // (per-browser). "Reset layout" clears them.
+  const saved = loadSavedLayout();
+  for (const n of graph.nodes) {
+    if (Array.isArray(saved[n.id])) {
+      n.homeX = n.x = n.fx = saved[n.id][0];
+      n.homeY = n.y = n.fy = saved[n.id][1];
+    }
+  }
+
+  // §6a.1 orbital layout: children take fixed angular slots around their
+  // parent at a computed radius (solar-system style), replacing the old
+  // convex-hull blob. Slots are assigned by each child's settled angle so
+  // nothing travels far; a user's own saved placement outranks its slot.
+  for (const fam of families) {
+    // The parent is the ring's center — pin it so the re-settle can't drift
+    // it off the orbit its children are slotted around.
+    fam.parent.fx = fam.parent.homeX;
+    fam.parent.fy = fam.parent.homeY;
+    const slots = orbitalSlots(
+      { x: fam.parent.homeX, y: fam.parent.homeY },
+      fam.children,
+      fam.radius
+    );
+    for (const child of fam.children) {
+      if (Array.isArray(saved[child.id])) continue;
+      const slot = slots.get(child.id);
+      child.orbital = true;
+      // Slots are FIXED (§6a.1): pin children like snapped nodes, so their
+      // own satellite links can't tug them off the orbit. Dragging still
+      // works — the drag handler overrides fx/fy for its duration.
+      child.homeX = child.x = child.fx = slot.x;
+      child.homeY = child.y = child.fy = slot.y;
+    }
+  }
+
+  simulation
+    .force('x', d3.forceX((d) => d.homeX).strength((d) => (d.orbital ? 0.7 : ANCHOR_STRENGTH)))
+    .force('y', d3.forceY((d) => d.homeY).strength((d) => (d.orbital ? 0.7 : ANCHOR_STRENGTH)));
+
+  // Re-settle so each relocated child's own satellites follow it to the new
+  // slot, then freeze those equilibria as the free nodes' homes. Full settle
+  // length: the wider orbits displace a lot of neighbors.
+  simulation.alpha(0.6);
+  for (let i = 0; i < SETTLE_TICKS; i++) simulation.tick();
+
+  // Relaxation pass: run ONLY the label-collide constraint for a few dozen
+  // iterations. During the force settle, a free node squeezed between pinned
+  // orbit boxes and its own link tension can oscillate instead of escaping —
+  // with the opposing forces silenced, boxes separate fully.
+  const relax = forceLabelCollide();
+  relax.initialize(graph.nodes);
+  for (let i = 0; i < 80; i++) relax();
+
+  for (const n of graph.nodes) {
+    if (!n.orbital && !Array.isArray(saved[n.id])) {
+      n.homeX = n.x;
+      n.homeY = n.y;
+    }
+  }
+  simulation.alpha(0);
+
+  /* dashed orbit paths behind the children (§6a.1, optional rendering) */
+  const orbits = hullLayer
+    .selectAll('circle')
     .data(families)
-    .join('path')
-    .attr('class', 'hull');
-  const hullLabels = hullLayer
-    .selectAll('text')
-    .data(families)
-    .join('text')
-    .attr('class', 'hull-label')
-    .text((d) => d.parent.name);
+    .join('circle')
+    .attr('class', 'orbit-path')
+    .attr('r', (d) => d.radius);
 
   /* links */
   const link = linkLayer
@@ -215,7 +311,7 @@ function render(graph) {
     .data(graph.nodes)
     .join('g')
     .attr('class', 'node')
-    .call(dragBehavior(simulation))
+    .call(dragBehavior(simulation, graph.nodes, families))
     .on('click', (event, d) => {
       event.stopPropagation();
       selectNode(d);
@@ -225,7 +321,13 @@ function render(graph) {
     .append('circle')
     .attr('class', 'core')
     .attr('r', (d) => d.r)
-    .attr('fill', (d) => (d.floor ? 'var(--floor-gray)' : fillScale(Math.max(0.06, d.relevance))));
+    .attr('fill', (d) =>
+      d.is_g7_client
+        ? clientFillScale(d.relevance)
+        : d.floor
+          ? 'var(--floor-gray)'
+          : fillScale(Math.max(0.06, d.relevance))
+    );
 
   // Concentric ring stack (open question #9/#11): color-only at default zoom,
   // text labels past the zoom threshold.
@@ -279,6 +381,10 @@ function render(graph) {
   document.getElementById('reset-view').addEventListener('click', () => {
     svg.transition().duration(500).call(zoom.transform, fitTransform());
   });
+  document.getElementById('reset-layout').addEventListener('click', () => {
+    localStorage.removeItem(LAYOUT_KEY);
+    location.reload();
+  });
   svg.call(zoom.transform, fitTransform());
 
   /* tick — also runs during drags so hulls and links track live (4b) */
@@ -289,10 +395,7 @@ function render(graph) {
       .attr('y1', (d) => d.source.y)
       .attr('x2', (d) => d.target.x)
       .attr('y2', (d) => d.target.y);
-    hulls.attr('d', (d) => hullPath(d.members));
-    hullLabels
-      .attr('x', (d) => d3.mean(d.members, (m) => m.x))
-      .attr('y', (d) => d3.min(d.members, (m) => m.y - m.r) - 14);
+    orbits.attr('cx', (d) => d.parent.x).attr('cy', (d) => d.parent.y);
     updateAnalogLines();
   }
   simulation.on('tick', ticked);
@@ -314,8 +417,10 @@ function render(graph) {
       'dimmed',
       (d) => !inLens(d.source, state.lens) || !inLens(d.target, state.lens)
     );
-    hulls.classed('dimmed', (d) => !d.members.some((m) => inLens(m, state.lens)));
-    hullLabels.classed('dimmed', (d) => !d.members.some((m) => inLens(m, state.lens)));
+    orbits.classed(
+      'dimmed',
+      (d) => ![d.parent, ...d.children].some((m) => inLens(m, state.lens))
+    );
   }
 
   /* selection-triggered structural analog highlight (Section 6a.7) */
@@ -389,12 +494,93 @@ function render(graph) {
   window.__cluster = { state, simulation };
 }
 
-/* ------------------------------------------------------------ drag (4b) */
+/* ------------------------------------------- label collision force (4d) */
 
-function dragBehavior(simulation) {
-  // Grab, rearrange, release: neighbors respond through the live forces, and
-  // the anchor force eases everything back home on release — temporary
-  // decluttering without permanently disrupting the shared layout.
+/**
+ * Always-on collision on label BOUNDING BOXES, not just node circles (§4d).
+ * Runs every simulation tick — including the initial settle, which is where
+ * the Cayman Jack/Olé label overlap came from — so the default auto-layout
+ * is label-aware, not just cleaned up after the fact.
+ *
+ * Overlapping boxes are pushed apart along the axis of least overlap. Like
+ * d3.forceCollide, the push is an iterative positional constraint NOT scaled
+ * by alpha — otherwise it fades away exactly when the layout is settling.
+ * O(n²) pairwise is fine at this graph size (~130 nodes).
+ */
+function forceLabelCollide() {
+  let nodes;
+  const strength = 0.5;
+
+  function force() {
+    for (let i = 0; i < nodes.length; i++) {
+      const a = nodes[i];
+      const ay = a.y + a.boxCy;
+      for (let j = i + 1; j < nodes.length; j++) {
+        const b = nodes[j];
+        const ox = a.boxHw + b.boxHw - Math.abs(b.x - a.x);
+        if (ox <= 0) continue;
+        const by = b.y + b.boxCy;
+        const oy = a.boxHh + b.boxHh - Math.abs(by - ay);
+        if (oy <= 0) continue;
+        const aFree = a.fx == null;
+        const bFree = b.fx == null;
+        if (!aFree && !bFree) continue; // both pinned/dragged — leave them
+        if (aFree && bFree) {
+          // Both movable: split the push along the axis of least overlap.
+          if (ox < oy) {
+            const push = ox * 0.5 * strength * (b.x > a.x ? 1 : -1);
+            a.x -= push;
+            b.x += push;
+          } else {
+            const push = oy * 0.5 * strength * (by > ay ? 1 : -1);
+            a.y -= push;
+            b.y += push;
+          }
+        } else {
+          // One side is pinned (orbit slot / user placement): push the free
+          // node RADIALLY away from the pinned box. Axis pushes cancel when a
+          // node is squeezed in the corridor between two pinned boxes;
+          // radial pushes compose outward and let it escape.
+          const free = aFree ? a : b;
+          const pin = aFree ? b : a;
+          let vx = free.x - pin.x;
+          let vy = free.y + free.boxCy - (pin.y + pin.boxCy);
+          const len = Math.hypot(vx, vy) || 1;
+          const push = Math.min(ox, oy) * strength;
+          free.x += (vx / len) * push;
+          free.y += (vy / len) * push;
+        }
+      }
+    }
+  }
+
+  force.initialize = (n) => (nodes = n);
+  return force;
+}
+
+/* ------------------------------------------------- drag (4b) + snap (4c) */
+
+const LAYOUT_KEY = 'cluster_layout_v1';
+
+function loadSavedLayout() {
+  try {
+    return JSON.parse(localStorage.getItem(LAYOUT_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveNodePosition(id, x, y) {
+  const all = loadSavedLayout();
+  all[id] = [Math.round(x * 10) / 10, Math.round(y * 10) / 10];
+  localStorage.setItem(LAYOUT_KEY, JSON.stringify(all));
+}
+
+function dragBehavior(simulation, nodes, families) {
+  // Dragging stays fluid (4b: neighbors respond through the live forces). On
+  // release the node snaps to the nearest UNOCCUPIED grid cell and stays —
+  // desktop-icon repositioning (§4c). The anchor force is what walks it onto
+  // the cell, so the snap animates instead of teleporting.
   return d3
     .drag()
     .on('start', (event, d) => {
@@ -408,36 +594,65 @@ function dragBehavior(simulation) {
     })
     .on('end', (event, d) => {
       if (!event.active) simulation.alphaTarget(0);
-      d.fx = null;
-      d.fy = null;
-      // one gentle reheat so the anchor force can walk everyone home
-      simulation.alpha(0.3).restart();
+      // Occupancy: every other node's home claims its containing cell, so two
+      // nodes can never land on the same spot (§4c fallback rule).
+      const occupied = new Set();
+      for (const n of nodes) {
+        if (n !== d) occupied.add(cellKey(...cellOf(n.homeX, n.homeY)));
+      }
+      const cell = nearestFreeCell(event.x, event.y, occupied);
+      const dx = cell.x - d.homeX;
+      const dy = cell.y - d.homeY;
+      d.homeX = cell.x;
+      d.homeY = cell.y;
+      saveNodePosition(d.id, cell.x, cell.y);
+      // Dragging a parent moves its orbit with it: children still in their
+      // slots (not individually placed by the user) keep formation. Their
+      // homes are derived from the parent's, so only the parent is saved.
+      if (d.type === 'parent') {
+        const fam = families.find((f) => f.parent === d);
+        const savedNow = loadSavedLayout();
+        for (const child of fam?.children || []) {
+          if (Array.isArray(savedNow[child.id])) continue;
+          child.homeX += dx;
+          child.homeY += dy;
+          // Glide the child's pin to its new slot alongside the parent's snap
+          // tween — the alpha-scaled anchor alone stalls out on long moves.
+          const from = { x: child.x, y: child.y };
+          const to = { x: child.homeX, y: child.homeY };
+          d3.select({}).transition().duration(300).ease(d3.easeCubicOut).tween('follow', () => (t) => {
+            child.x = child.fx = from.x + (to.x - from.x) * t;
+            child.y = child.fy = from.y + (to.y - from.y) * t;
+            child.vx = 0;
+            child.vy = 0;
+          });
+        }
+      }
+      // d3.forceX/Y cache their target accessor at initialization — homes
+      // just changed, so re-point the anchors or they pull at stale spots.
+      simulation.force('x').x((n) => n.homeX);
+      simulation.force('y').y((n) => n.homeY);
+      // Placed nodes stay pinned to their cell (desktop-icon semantics) —
+      // link tension must not drag them off it. Short tween so the snap
+      // animates rather than teleporting.
+      const from = { x: event.x, y: event.y };
+      d3.select({}).transition().duration(220).ease(d3.easeCubicOut).tween('snap', () => (t) => {
+        d.fx = from.x + (cell.x - from.x) * t;
+        d.fy = from.y + (cell.y - from.y) * t;
+      });
+      simulation.alpha(0.35).restart();
     });
 }
 
-/* ----------------------------------------------------------------- hulls */
+/* -------------------------------------------------------------- families */
 
 function buildFamilies(graph) {
   const families = [];
   for (const parent of graph.nodes.filter((n) => n.type === 'parent')) {
-    const members = [parent, ...graph.nodes.filter((n) => n.parent === parent.id)];
-    if (members.length >= 2) families.push({ parent, members });
+    const children = graph.nodes.filter((n) => n.parent === parent.id);
+    if (children.length >= 1) families.push({ parent, children });
   }
   return families;
-}
-
-function hullPath(members) {
-  // Pad each member with satellite points so the hull wraps circles, not centers.
-  const pts = [];
-  for (const m of members) {
-    const pad = m.r + 14;
-    for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
-      pts.push([m.x + pad * Math.cos(a), m.y + pad * Math.sin(a)]);
-    }
-  }
-  const hull = d3.polygonHull(pts);
-  if (!hull) return '';
-  return `M${hull.join('L')}Z`;
 }
 
 /* ----------------------------------------------------------------- panel */
@@ -452,6 +667,7 @@ function showPanel(d) {
   parts.push(`<div class="subtitle">${sub.join(' · ')}</div>`);
 
   const badges = [];
+  if (d.is_g7_client) badges.push('<span class="badge client">G7 CLIENT</span>');
   if (d.zone) badges.push(`<span class="badge zone">${esc(d.zone.toUpperCase())}</span>`);
   if (d.rings?.includes('signal')) badges.push('<span class="badge signal">SIGNAL STACKS</span>');
   if (d.rings?.includes('rfp')) badges.push('<span class="badge rfp">RFP</span>');
@@ -460,7 +676,9 @@ function showPanel(d) {
 
   /* relevance / signal state */
   parts.push('<h3>Signal</h3>');
-  if (d.floor) {
+  if (d.floor && d.is_g7_client) {
+    parts.push('<p class="rel-note">Confirmed G7 client — renders in base G7 purple regardless of live-signal status (§5a). No live signal yet; a real signal will darken the shade.</p>');
+  } else if (d.floor) {
     parts.push('<p class="rel-note">Floor state — no live signal yet. Here as research/environmental context; Signal Stacks lights this up when a real signal arrives.</p>');
   } else {
     const pct = Math.round((eff?.relevance || 0) * 100);

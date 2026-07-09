@@ -58,6 +58,17 @@ describe('buildGraphFromSeed', () => {
     expect(graph.links.some((l) => l.relationship === 'structurally_analogous_client')).toBe(false);
   });
 
+  it('carries the §5a client identity marker (clients true; lapsed and non-clients false)', () => {
+    const byId = (id) => graph.nodes.find((n) => n.id === id);
+    expect(byId('white_claw').is_g7_client).toBe(true);
+    expect(byId('turbotax_intuit').is_g7_client).toBe(false); // lapsed — stays floor-gray
+    expect(byId('yeti').is_g7_client).toBe(false); // adjacent brand
+    expect(byId('mark_anthony_brands').is_g7_client).toBe(false); // parent, not a direct client
+    // Note: the seed marks 14 hubs true (incl. Olé); the plan §5a list has 13
+    // (Olé absent) — the build trusts the JSON. Flagged for reconciliation.
+    expect(graph.nodes.filter((n) => n.is_g7_client).length).toBeGreaterThanOrEqual(13);
+  });
+
   it('carries COI flags onto links and nodes', () => {
     const twisted = graph.links.find((l) => l.target === 'twisted_tea');
     expect(twisted.coi_sensitive).toBe(true);
@@ -67,7 +78,7 @@ describe('buildGraphFromSeed', () => {
 
 describe('buildGraphFromSheet', () => {
   const nodeRows = [
-    { id: 'white_claw', name: 'White Claw', type: 'hub', zone: 'combo', category: 'Hard seltzer', parent: 'mabi', signal_strength: '0.9', signal_date: daysAgo(0), signal_type: 'signal_stacks', coi_sensitive: '', notes: 'warm relationship', date_added: '', confidence: 'verified' },
+    { id: 'white_claw', name: 'White Claw', type: 'hub', zone: 'combo', category: 'Hard seltzer', parent: 'mabi', is_g7_client: 'TRUE', signal_strength: '0.9', signal_date: daysAgo(0), signal_type: 'signal_stacks', coi_sensitive: '', notes: 'warm relationship', date_added: '', confidence: 'verified' },
     { id: 'mabi', name: 'Mark Anthony Brands', type: 'parent', zone: '', category: '', parent: '', signal_strength: '', signal_date: '', signal_type: '', coi_sensitive: '', notes: '', date_added: '', confidence: '' },
     { id: 'truly', name: 'Truly', type: 'adjacent', zone: '', category: '', parent: '', signal_strength: '', signal_date: '', signal_type: '', coi_sensitive: 'TRUE', notes: '', date_added: '2026-07-07', confidence: '' },
     { id: '', name: '', type: '', zone: '', category: '', parent: '', signal_strength: '', signal_date: '', signal_type: '', coi_sensitive: '', notes: '', date_added: '', confidence: '' },
@@ -84,6 +95,8 @@ describe('buildGraphFromSheet', () => {
     const wc = graph.nodes.find((n) => n.id === 'white_claw');
     expect(wc.signal).toEqual({ strength: 0.9, date: daysAgo(0), type: 'signal_stacks' });
     expect(wc.parent).toBe('mabi');
+    expect(wc.is_g7_client).toBe(true);
+    expect(graph.nodes.find((n) => n.id === 'truly').is_g7_client).toBe(false);
   });
 
   it('drops relationships pointing at unknown nodes', () => {

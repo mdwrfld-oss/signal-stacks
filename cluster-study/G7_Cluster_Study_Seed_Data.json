@@ -66,7 +66,8 @@
       "g7_notes": {
         "case_study_learnings": "Audience is receptive to data capture if incentivized with exclusive experiences or merch. Simpler tactics that ladder to immediate gratification outperform deep concepts and complicated consumer journeys.",
         "relationship_notes": "Part of the Mark Anthony Brands relationship — G7's warmest client relationship overall. Historically included talent booking; that has recently changed (Experiential only going forward)."
-      }
+      },
+      "is_g7_client": true
     },
     {
       "id": "liquid_death",
@@ -115,7 +116,8 @@
           "relationship": "analogous_audience",
           "note": "Energy drink category adjacency post-expansion"
         }
-      ]
+      ],
+      "is_g7_client": true
     },
     {
       "id": "fireball_whiskey",
@@ -154,7 +156,8 @@
           "relationship": "analogous_audience",
           "note": "Tequila-based spiced liqueur, same occasion"
         }
-      ]
+      ],
+      "is_g7_client": true
     },
     {
       "id": "ram_trucks",
@@ -193,7 +196,8 @@
           "relationship": "analogous_audience",
           "note": "Rural/workwear-lifestyle audience overlap"
         }
-      ]
+      ],
+      "is_g7_client": true
     },
     {
       "id": "turbotax_intuit",
@@ -231,7 +235,8 @@
       "g7_notes": {
         "case_study_learnings": "Consumers must be strongly incentivized to engage. Effective pattern: load the experience with incentives and directly link TurboTax employees with consumers for follow-up after the event. Has partnered with talent on economic-fluency-themed initiatives.",
         "relationship_notes": "Lapsed — last worked together roughly a year ago, not a current client. G7 has done both Experiential and Talent Booking work for them, at both the TurboTax and Intuit corporate level."
-      }
+      },
+      "is_g7_client": false
     },
     {
       "id": "atlassian",
@@ -270,7 +275,8 @@
           "relationship": "analogous_audience",
           "note": "Overlapping modern-team-workflow buyer persona"
         }
-      ]
+      ],
+      "is_g7_client": true
     },
     {
       "id": "subaru",
@@ -313,7 +319,8 @@
       "g7_notes": {
         "case_study_learnings": "Top KPI is hot-lead capture. Secondary goal: impacting the Overlanding space currently dominated by Jeep. Audience is highly loyal, responds well to exclusive programming, and will go out of its way to engage.",
         "relationship_notes": "Current client. G7 has pitched for additional Experiential business without success, and separately pitched Talent Booking business that also did not close (RFP: Lost, Talent lane) — worth surfacing as a lookalike-search trigger per Section 6."
-      }
+      },
+      "is_g7_client": true
     },
     {
       "id": "lagunitas",
@@ -351,7 +358,8 @@
       "g7_notes": {
         "case_study_learnings": "A challenging account — core demographic is trending toward reduced alcohol consumption, and the brand is actively pushing against that trend.",
         "relationship_notes": "A few programs per year. Client-side organization makes long-term planning difficult."
-      }
+      },
+      "is_g7_client": true
     },
     {
       "id": "jackson_hole",
@@ -394,7 +402,8 @@
       "g7_notes": {
         "case_study_learnings": "G7 manages the Rendezvous Music Festival end-to-end (Experiential + Talent Booking). Attendance has trended down in recent years since the festival shifted from free to paid admission.",
         "relationship_notes": "Yearly client; work is expected to continue."
-      }
+      },
+      "is_g7_client": true
     },
     {
       "id": "workday",
@@ -428,7 +437,8 @@
           "relationship": "analogous_audience",
           "note": "Overlapping enterprise IT/HR leadership buyer persona"
         }
-      ]
+      ],
+      "is_g7_client": true
     },
     {
       "id": "cisco",
@@ -462,7 +472,8 @@
           "relationship": "analogous_audience",
           "note": "Overlapping enterprise IT decision-maker audience"
         }
-      ]
+      ],
+      "is_g7_client": true
     },
     {
       "id": "mikes_hard_lemonade",
@@ -488,7 +499,8 @@
           "coi_sensitive": true,
           "coi_note": "Same MABI sensitivity as above."
         }
-      ]
+      ],
+      "is_g7_client": true
     },
     {
       "id": "cayman_jack",
@@ -535,7 +547,8 @@
           "coi_sensitive": true,
           "coi_note": "MABI sensitivity — treat as outreach-cautious."
         }
-      ]
+      ],
+      "is_g7_client": true
     },
     {
       "id": "ole",
@@ -568,7 +581,8 @@
           "coi_sensitive": true,
           "coi_note": "MABI sensitivity — treat as outreach-cautious."
         }
-      ]
+      ],
+      "is_g7_client": true
     },
     {
       "id": "mojo_energy",
@@ -611,7 +625,8 @@
           "relationship": "direct_competitor",
           "note": "Caffeine pouch vertical, direct competitor"
         }
-      ]
+      ],
+      "is_g7_client": true
     }
   ],
   "corporate_parents": [
