@@ -5,6 +5,11 @@ export default defineWorkersConfig({
     poolOptions: {
       workers: {
         wrangler: { configPath: './wrangler.jsonc' },
+        // Tests must never read production data: shadow the remote KV
+        // binding with a local, empty namespace.
+        miniflare: {
+          kvNamespaces: ['CLUSTER_KV'],
+        },
       },
     },
   },

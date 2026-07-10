@@ -52,6 +52,18 @@ On release (not mid-drag, to keep movement fluid), a dragged node snaps to the n
 ### 4d. Label and node collision avoidance (added this session, from live-build feedback)
 Distinct from 4c — this needs to be **always-on**, not just a response to manual dragging, since the default auto-generated layout can produce overlapping labels on its own (seen directly in the first build's Cayman Jack/Olé cluster, where competitor labels crowded and overlapped). Requires a dedicated collision force operating on label **bounding boxes**, not just node circles — text is wider than the circle it's attached to, and the existing `forceCollide` on nodes alone won't prevent label overlap. Runs continuously as part of the simulation tick, not as a one-time cleanup pass. Estimated: 3–5 hours, likely the most iteration-heavy piece of this round of refinements.
 
+### 4e. Cluster spacing tuning (added this session, from live-build feedback)
+Default spacing between distinct clusters (each parent-family group, and each standalone hub node) should start with more breathing room — a global tuning pass on repulsion/link-distance forces rather than a new mechanic. **Estimated: ~1 hour.**
+
+### 4f. Vertical sectors (added this session)
+New spatial layer, proposed alongside the stellar-cartography aesthetic direction (5c): six verticals — Food & Beverage, Automotive & Transportation, Technology & B2B, CPGs, Sports, Hospitality/Travel/Tourism — each occupying a defined region of the canvas, similar to quadrants on a star chart.
+
+**Resolved approach: true spatial sectors, not just background tinting.** Each node's anchor position (4) is pulled toward its vertical's sector region via an additional force, layered on top of the existing anchor-to-home and orbit-around-parent forces. This is the more literal match for the astronomical reference and produces a genuinely useful side effect: a `direct_competitor` edge staying within one sector is visually unremarkable (expected), while an `analogous_audience` edge stretching *across* sectors becomes a visible signal in its own right — e.g., a future Subaru → outdoor-lifestyle-brand connection reading as a visible "trade route between different customer galaxies," which is exactly the kind of parallel-lane insight Cluster exists to surface. Sector boundaries render as faint grid/quadrant lines with small corner labels, not solid color fills — solid fills would compete with node fill color, which already carries relevance/identity meaning (Sections 5, 5a).
+
+**Resolved:**
+- **CPGs is scoped to non-food packaged goods** — skincare, toys, household products, etc. — distinct from Food & Beverage. Given the current roster, this means every current beverage/spirits hub node (White Claw, Mike's Hard Lemonade, Cayman Jack, Olé, Fireball, Liquid Death, Lagunitas, Mojo Energy) belongs in **Food & Beverage**, and **CPGs currently has no hub node**, same as Sports.
+- **Empty sectors (Sports, CPGs) are fine for now** — not a bug, just reflects where G7's current roster actually sits. Both sectors still render as defined regions on the sector chart, ready to receive nodes as the roster grows.
+
 ## 5. Visual grammar — resolved to a two-state color model (revised this session)
 
 Originally proposed as three-plus color states (recency-fading gray for "aware but thin," green for client status with its own fade, plus the floor state). After working through the philosophical question of what Cluster is *for* (Section 2, principle 6), this collapsed back to two states:
@@ -78,6 +90,17 @@ The first live build rendered every node in floor-gray by default, which surface
 **Confirmed owned-client list (13):** Cayman Jack, Mike's Hard Lemonade, White Claw, Fireball Whiskey, Liquid Death, Mojo Energy, Ram Trucks, Lagunitas, Subaru, Jackson Hole Mountain Resort, Atlassian, Workday, Cisco. TurboTax/Intuit remains floor-gray given its lapsed status. Implemented as `is_g7_client` (boolean) on every hub node in the seed JSON.
 
 **Estimated: 1–2 hours** to wire the rendering rule now that the client list is finalized.
+
+### 5b. Drop shadows for parent and client nodes only (added this session, from live-build feedback)
+Subtle drop shadows applied to parent entity nodes (Mark Anthony Brands, Intuit, Swisher) and owned-client nodes (`is_g7_client: true`) — reinforces the same distinction as the purple identity marker (5a), giving real G7 relationships and their organizing parents a slight visual "lift" off the canvas. Competitor/adjacent nodes and floor-state nodes stay flat, no shadow — keeps the visual hierarchy consistent with the color distinction rather than working against it. **Estimated: ~1 hour.**
+
+### 5c. Stellar cartography aesthetic (added this session)
+Overall visual direction, inspired by astronomy charts / Star Trek-style stellar cartography — coheres well with mechanics already in place (orbital parent/child layout, ring grammar) rather than requiring rework:
+- **Dark canvas** replacing the current light background — reinforces "star map" over "flowchart" immediately
+- **Nodes as glowing points** (radial gradient / soft glow filter) rather than flat-fill circles, especially on `is_g7_client` and parent nodes — this can likely *replace* the flat drop-shadow treatment from 5b with something more on-theme; worth deciding once both are visible side by side
+- **Edges as faint "trade routes"** — thin, slightly luminous lines rather than plain strokes; the structural-analog selection-highlight (6a.7) fits naturally as a "warp lane" motif that only appears on demand
+- **Sector boundaries (4f) as faint grid lines with corner labels**, not solid fills, consistent with keeping node fill color free to carry relevance/identity meaning
+- **Revisits the open idle-drift question (4b):** this aesthetic is the strongest argument yet for subtle ambient motion at rest — stars drift gently in every reference for this style, and the mechanism already exists via the anchor-force system, so this may now be worth resolving in favor of "yes, drift" rather than leaving it open indefinitely
 
 ## 6. RFP tracker as a scoring input (revised this session — no longer a displayed status type)
 
@@ -114,6 +137,9 @@ Prompted by a real case: Pringles (a real G7 relationship) is owned by Kellogg's
 
 **Estimated: 4–6 hours** — radial positioning logic to replace the hull, larger-radius scaling rule, optional orbit-path rendering.
 
+### 6a.1a Orbit exclusion zone (added this session, from live-build feedback)
+A real problem surfaced in the live build: competitor/adjacent nodes belonging to a *child* (e.g., Twisted Tea, orbiting near Mike's Hard Lemonade) were visually falling inside the parent's orbit ring — implying they're affiliated with the parent (Mark Anthony Brands) itself, which is false and actively misleading. **Resolved:** the parent's orbit radius acts as an exclusion boundary — any non-family node (a competitor/adjacent node not belonging to this parent's cluster) that falls within that radius gets pushed outward until it clears the boundary, similar to a collision force against a fixed circular obstacle rather than another node. This needs to apply per parent cluster (Mark Anthony Brands, Intuit, Swisher each maintain their own exclusion zone). **Estimated: 2–3 hours**, layered onto the orbital layout work above.
+
 ### 6a.2 New edge type
 `parent_of` / `subsidiary_of` — distinct from `direct_competitor` and `analogous_audience`, since it's a structural relationship, not a competitive or audience one.
 
@@ -144,6 +170,18 @@ Structurally analogous clients (Section 11's `structural_analogs` field — e.g.
 - **Not a persistent line either.** A permanent connecting edge between every structurally-analogous pair would clutter the graph with relationships that are only occasionally useful, unlike grounded competitor/analog edges which are core to the layout's purpose (Section 2, principle 1).
 - **Resolved approach: selection-triggered highlight.** Structural-analog connections render only when a node is actively selected/clicked — at that moment, its structural analogs light up (e.g., a distinct highlight color or connecting line that appears only in this state), then disappear when the selection clears. This keeps the default view clean while still surfacing the insight ("this client is structured like that one") exactly when it's useful — during focused exploration of a specific node, not as ambient visual noise.
 - **General pattern worth reusing:** this selection-triggered-only rendering is a reasonable model for any relationship type that's real and useful but not spatially meaningful — worth keeping in mind if other non-spatial relationship types emerge later.
+
+## 6b. Signal Stacks ingestion (added this session)
+
+This was already the intended long-term data architecture (Section 8 — reading live from the same Backbone Sheet via Signal Stacks' existing Service Account/JWT pattern), now being implemented directly.
+
+**Mechanism:** fetch Backbone Sheet rows, match `brand_name` against Cluster's full node set (both hub nodes *and* adjacent/competitor nodes — a signal can land on a floor-state competitor just as easily as an existing client). On match: activate that node's ring and feed `signal_strength`/recency into the existing relevance formula (Section 5).
+
+**Real implementation risk worth flagging:** name matching. "White Claw" in the Sheet vs. "White Claw Seltzer" in a headline, punctuation/casing differences, etc. Needs either fuzzy matching or a small manual alias table per node — Claude Code should flag ambiguous matches rather than silently guessing on a fuzzy match it isn't confident about.
+
+**Given the near-term demo (Julie, tomorrow):** recommend a two-step path rather than building the full live pipeline under time pressure tonight:
+1. **Fast path for tomorrow:** manually export the current Backbone Sheet (Google Sheets → File → Download → CSV, or just share the relevant range) and hand it to Claude Code as a static file for a one-time ingestion pass. Avoids debugging live Service Account auth on a deadline — same matching/rendering logic either way, just a simpler data source for now.
+2. **Proper pipeline, after the demo:** wire the live Service Account fetch per the original Section 8 architecture, so Cluster stays current automatically as Signal Stacks appends new rows, rather than needing repeated manual exports.
 
 ## 7. Data dependencies (the real blocker)
 
@@ -221,7 +259,7 @@ Cluster's real constraint is dependency order, not a calendar date:
 - **Gate 2:** RFP-triggered lookalike pipeline (Section 6) scoped and tested against a handful of real past RFPs.
 - **Gate 2a (new):** Parent/subsidiary mapping (Section 6a) scoped — a smaller, more contained research task than Gate 1's full competitor/analog research, since it only needs ownership relationships, not full competitive landscapes.
 - **Gate 3:** Open questions in Section 9 resolved — several already closed this session (floor color, current/past client status, layout mechanism); remainder are cheap now, expensive to retrofit after nodes are live.
-- **Gate 4:** Build, recommended in Claude Code (Section 8) once Gates 0–3 are sufficiently clear. **Underway** — first live build complete (screenshot reviewed this session showing the Mark Anthony Brands cluster, ring rendering, and floor-gray nodes working). Rough estimate for remaining work: 10–16 hours for remaining core D3 mechanics + 4–7 hours for draggable nodes with return-to-home (Section 4b) + 8–12 hours for the RFP lookalike pipeline + additional time, not yet estimated, for the parent/subsidiary propagation logic (Section 6a.3–6a.6). **Round 2 refinements from live-build feedback, this session:** 2–3 hrs (snap-to-grid drag, 4c) + 3–5 hrs (label/collision avoidance, 4d) + 1–2 hrs (client identity marker, 5a — **unblocked**, 13-client list finalized) + 4–6 hrs (orbital layout + larger parent nodes, 6a.1) ≈ **10–16 additional hours.**
+- **Gate 4:** Build, recommended in Claude Code (Section 8) once Gates 0–3 are sufficiently clear. **Underway** — first live build complete (screenshot reviewed this session showing the Mark Anthony Brands cluster, ring rendering, and floor-gray nodes working). Rough estimate for remaining work: 10–16 hours for remaining core D3 mechanics + 4–7 hours for draggable nodes with return-to-home (Section 4b) + 8–12 hours for the RFP lookalike pipeline + additional time, not yet estimated, for the parent/subsidiary propagation logic (Section 6a.3–6a.6). **Round 2 refinements from live-build feedback, this session:** 2–3 hrs (snap-to-grid drag, 4c) + 3–5 hrs (label/collision avoidance, 4d) + 1–2 hrs (client identity marker, 5a) + 4–6 hrs (orbital layout + larger parent nodes, 6a.1) + 2–3 hrs (orbit exclusion zone, 6a.1a) + 1 hr (cluster spacing tuning, 4e) + 1 hr (drop shadows, 5b) ≈ **14–21 additional hours.**
 - **Gate 5:** Launch NBD view first; Leadership view once revenue data exists.
 
 **Bootstrap rationale:** since Signal Stacks will take time to build up steam, Cluster's node population doesn't need to wait for it — the manual case-study/AI-assisted lane (one of the three original data-entry paths) can run independently now. These become permanent floor-state nodes (Section 5) with no ring or relevance decay; Signal Stacks later lights up rings/fill on top of the same brands as live signals arrive, rather than creating the nodes from scratch.

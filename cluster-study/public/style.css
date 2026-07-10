@@ -1,16 +1,17 @@
+/* §5c stellar cartography: dark canvas, luminous accents. */
 :root {
   --g7-purple: #3a1d6e;
   --g7-purple-light: #e8e0f7;
-  --floor-gray: #c9c9c9;
-  --ring-signal: #1f9e89;
-  --ring-rfp: #e67e22;
-  --ring-new: #d62828;
-  --hull: #6a4c93;
-  --analog-gold: #d4a017;
-  --bg: #faf9fc;
-  --panel-bg: #ffffff;
-  --text: #241b35;
-  --muted: #6f6785;
+  --floor-gray: #3d3a4c;
+  --ring-signal: #2fd4b8;
+  --ring-rfp: #ff9440;
+  --ring-new: #ff5252;
+  --hull: #8b7dd8;
+  --analog-gold: #e8c15a;
+  --bg: #0d0b1a;
+  --panel-bg: #16132a;
+  --text: #e2ddf2;
+  --muted: #9a92b8;
 }
 
 * { box-sizing: border-box; }
@@ -88,16 +89,26 @@ body { display: flex; flex-direction: column; }
 
 /* ---- graph elements ---- */
 
-.link { stroke: #b9b0cc; stroke-width: 1.2px; }
-.link.parent_of { stroke: var(--hull); stroke-width: 1.6px; stroke-dasharray: 2 3; }
+/* §5c: edges as faint luminous "trade routes". */
+.link { stroke: rgba(155, 140, 255, 0.22); stroke-width: 1.2px; }
+.link.parent_of { stroke: rgba(139, 125, 216, 0.5); stroke-width: 1.6px; stroke-dasharray: 2 3; }
 .link.analogous_audience { stroke-dasharray: 5 4; }
+
+/* §4f sector boundaries: faint grid lines with corner labels, no fills. */
+.sector-line { stroke: rgba(139, 125, 216, 0.16); stroke-width: 1; }
+.sector-label {
+  fill: rgba(154, 146, 184, 0.55);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+}
 
 /* §6a.1 orbital layout: dashed orbit path behind a parent's children. */
 .orbit-path {
   fill: var(--hull);
-  fill-opacity: 0.04;
+  fill-opacity: 0.05;
   stroke: var(--hull);
-  stroke-opacity: 0.45;
+  stroke-opacity: 0.5;
   stroke-width: 1.2;
   stroke-dasharray: 6 6;
 }
@@ -110,10 +121,14 @@ body { display: flex; flex-direction: column; }
 }
 
 .node { cursor: pointer; }
-.node circle.core { stroke: #fff; stroke-width: 1.5px; }
-/* §5b: parents + owned clients only — adjacent/floor nodes stay flat. */
-.node circle.core.elevated { filter: drop-shadow(0 2px 3px rgba(36, 27, 53, 0.35)); }
-.node.selected circle.core { stroke: var(--text); stroke-width: 2.5px; }
+.node circle.core { stroke: rgba(226, 221, 242, 0.3); stroke-width: 1px; }
+/* §5c: glowing points replace the §5b flat drop shadow — parents + owned
+   clients only; adjacent/floor nodes stay flat, keeping the §5a split. */
+.node circle.core.elevated {
+  filter: drop-shadow(0 0 5px rgba(168, 134, 255, 0.9))
+    drop-shadow(0 0 14px rgba(122, 88, 199, 0.5));
+}
+.node.selected circle.core { stroke: #ffffff; stroke-width: 2.5px; }
 .node.analog-partner circle.core { stroke: var(--analog-gold); stroke-width: 3px; }
 
 .ring { fill: none; stroke-width: 2.5px; }
@@ -135,17 +150,17 @@ body { display: flex; flex-direction: column; }
 
 .node-label {
   font-size: 11px;
-  fill: var(--text);
+  fill: #d6d0e8;
   paint-order: stroke;
-  stroke: rgba(250, 249, 252, 0.85);
+  stroke: rgba(13, 11, 26, 0.9);
   stroke-width: 3px;
   pointer-events: none;
 }
-.node-label.adjacent-label { font-size: 9px; fill: var(--muted); }
+.node-label.adjacent-label { font-size: 9px; fill: #8f87ad; }
 .zoomed-out .adjacent-label { display: none; }
 
 /* Lens dimming: switched-off, not removed (Section 4). */
-.dimmed { opacity: 0.13; filter: grayscale(0.85); transition: opacity 0.25s; }
+.dimmed { opacity: 0.1; filter: grayscale(0.85); transition: opacity 0.25s; }
 
 /* ---- panel ---- */
 
@@ -157,8 +172,9 @@ body { display: flex; flex-direction: column; }
   max-height: calc(100% - 24px);
   overflow-y: auto;
   background: var(--panel-bg);
+  border: 1px solid rgba(139, 125, 216, 0.25);
   border-radius: 12px;
-  box-shadow: 0 8px 30px rgba(36, 27, 53, 0.18);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.55);
   padding: 16px 18px;
 }
 #detail-panel.hidden { display: none; }
@@ -192,20 +208,20 @@ body { display: flex; flex-direction: column; }
   margin-right: 4px;
   vertical-align: middle;
 }
-.badge.zone { background: var(--g7-purple-light); color: var(--g7-purple); }
-.badge.client { background: var(--g7-purple); color: #fff; }
-.badge.signal { background: #d9f2ec; color: #0d6e5e; }
-.badge.rfp { background: #fbe8d7; color: #a35311; }
-.badge.coi { background: #fdeaea; color: #a11212; }
+.badge.zone { background: #2c2350; color: #cdbdf5; }
+.badge.client { background: #6a48b8; color: #fff; }
+.badge.signal { background: #123c34; color: #4ee0c2; }
+.badge.rfp { background: #45280f; color: #ffb26e; }
+.badge.coi { background: #451518; color: #ff9d9d; }
 .rel-note { color: var(--muted); font-size: 12px; }
 .relevance-bar {
   height: 8px;
   border-radius: 4px;
-  background: #eee7f8;
+  background: #262040;
   overflow: hidden;
   margin: 4px 0 2px;
 }
-.relevance-bar > div { height: 100%; background: var(--g7-purple); }
+.relevance-bar > div { height: 100%; background: #a886ff; }
 
 /* ---- legend & status ---- */
 
@@ -213,17 +229,18 @@ body { display: flex; flex-direction: column; }
   position: absolute;
   left: 12px;
   bottom: 12px;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(22, 19, 42, 0.92);
+  border: 1px solid rgba(139, 125, 216, 0.2);
   border-radius: 10px;
   padding: 10px 14px;
   font-size: 11.5px;
   color: var(--muted);
-  box-shadow: 0 2px 12px rgba(36, 27, 53, 0.1);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
 }
 .legend-row { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
 .swatch { width: 14px; height: 14px; border-radius: 50%; flex: 0 0 auto; }
-.swatch.gradient { background: linear-gradient(90deg, var(--g7-purple-light), var(--g7-purple)); border-radius: 4px; }
-.swatch.client { background: linear-gradient(90deg, #8a6cc4, #26104e); }
+.swatch.gradient { background: linear-gradient(90deg, #3c3357, #b79aff); border-radius: 4px; }
+.swatch.client { background: linear-gradient(90deg, #6a48b8, #d4bfff); }
 .swatch.floor { background: var(--floor-gray); }
 .swatch.ring { background: #fff; border: 2.5px solid; }
 .swatch.ring-signal { border-color: var(--ring-signal); }
@@ -235,7 +252,7 @@ body { display: flex; flex-direction: column; }
   position: absolute;
   top: 12px;
   left: 12px;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(22, 19, 42, 0.92);
   border-radius: 8px;
   padding: 6px 12px;
   font-size: 12px;
@@ -245,7 +262,9 @@ body { display: flex; flex-direction: column; }
 
 /* ---- review page ---- */
 
-.review-body { padding: 24px; max-width: 900px; margin: 0 auto; display: block; }
+/* The review page opts out of the §5c dark theme — it's a form, not a chart. */
+.review-body { padding: 24px; max-width: 900px; margin: 0 auto; display: block; background: #faf9fc; color: #241b35; }
+.review-body a { color: #3a1d6e; }
 .review-body h1 { font-size: 20px; }
 .review-card {
   background: #fff;

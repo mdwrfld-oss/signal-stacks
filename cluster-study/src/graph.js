@@ -194,6 +194,7 @@ export function buildGraphFromSheet(nodeRows, relRows) {
       category: (row.category || '').trim() || null,
       zone: (row.zone || '').trim().toLowerCase() || null,
       parent: (row.parent || '').trim() || null,
+      sector: (row.sector || '').trim().toLowerCase() || null,
       is_g7_client: parseBool(row.is_g7_client),
       confidence: (row.confidence || '').trim() || null,
       g7_notes: (row.notes || '').trim() ? { relationship_notes: row.notes.trim() } : null,

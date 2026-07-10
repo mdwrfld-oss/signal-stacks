@@ -46,6 +46,55 @@ const ADJ_LABEL_ZOOM = 0.85;
 const RADII = { hub: 16, parent: 24, adjacent: 8 };
 const RING_GAP = 4;
 
+/* §4f vertical sectors: six regions on a 3×2 star-chart grid. */
+const SECTORS = [
+  { id: 'food_beverage', label: 'FOOD & BEVERAGE', col: 0, row: 0 },
+  { id: 'automotive', label: 'AUTOMOTIVE & TRANSPORTATION', col: 1, row: 0 },
+  { id: 'tech_b2b', label: 'TECHNOLOGY & B2B', col: 2, row: 0 },
+  { id: 'cpg', label: 'CPGs', col: 0, row: 1 },
+  { id: 'sports', label: 'SPORTS', col: 1, row: 1 },
+  { id: 'hospitality', label: 'HOSPITALITY / TRAVEL / TOURISM', col: 2, row: 1 },
+];
+// Cell size has to hold the largest sector (Food & Beverage: ~10 clusters
+// including the MABI orbit) at current repulsion levels.
+const SECTOR_W = 950;
+const SECTOR_H = 800;
+
+/**
+ * Sector membership: hubs and parents classify explicitly; adjacent nodes
+ * inherit their connected hubs' sector — EXCEPT the outdoor-lifestyle
+ * override, which is what makes Subaru → REI/Yeti/Patagonia read as
+ * cross-sector "trade routes" (§4f). A `sector` field carried in the graph
+ * data (Sheet column / CSV ingestion) always wins over this map.
+ */
+const SECTOR_BY_NODE = {
+  white_claw: 'food_beverage',
+  mikes_hard_lemonade: 'food_beverage',
+  cayman_jack: 'food_beverage',
+  ole: 'food_beverage',
+  fireball_whiskey: 'food_beverage',
+  liquid_death: 'food_beverage',
+  lagunitas: 'food_beverage',
+  mojo_energy: 'food_beverage',
+  mark_anthony_brands: 'food_beverage',
+  swisher: 'food_beverage',
+  ram_trucks: 'automotive',
+  subaru: 'automotive',
+  turbotax_intuit: 'tech_b2b',
+  atlassian: 'tech_b2b',
+  workday: 'tech_b2b',
+  cisco: 'tech_b2b',
+  intuit: 'tech_b2b',
+  jackson_hole: 'hospitality',
+  // Outdoor-lifestyle brands are CPGs (non-food packaged goods), not their
+  // hubs' verticals.
+  yeti: 'cpg',
+  carhartt: 'cpg',
+  rei: 'cpg',
+  patagonia: 'cpg',
+  the_north_face: 'cpg',
+};
+
 const state = {
   graph: null,
   config: DEFAULT_CONFIG,
@@ -58,12 +107,22 @@ const state = {
   analogPairs: [],
 };
 
-// Non-client fill: light lavender → dark purple by relevance (only once a
+// §5c dark canvas flips the relevance encoding direction: on a star chart,
+// MORE relevance = a BRIGHTER star (same meaning — more salient — as "darker"
+// was on the light background).
+// Non-client fill: dim violet → bright lavender by relevance (only once a
 // real live signal exists — otherwise floor-gray).
-const fillScale = d3.interpolateRgb('#e8e0f7', '#3a1d6e');
-// §5a client fill: confirmed G7 clients are ALWAYS purple — the base is a
-// clearly-purple resting shade, and relevance darkens within the family.
-const clientFillScale = d3.interpolateRgb('#8a6cc4', '#26104e');
+const fillScale = d3.interpolateRgb('#3c3357', '#b79aff');
+// §5a client fill: confirmed G7 clients are ALWAYS purple — a clearly-purple
+// resting shade, brightening within the family as signals arrive.
+const clientFillScale = d3.interpolateRgb('#6a48b8', '#d4bfff');
+
+// §5c idle drift (resolves open question 4b in favor of "yes, drift"):
+// stars drift gently at rest. Purely visual — the offset is applied to the
+// rendered transform only, never to simulation coordinates, so layout,
+// snapping, and hit-testing are untouched. Set amplitude 0 to disable.
+const DRIFT_AMPLITUDE = 1.6;
+const DRIFT_SPEED = 0.00045;
 
 init().catch((err) => {
   statusEl.textContent = `Failed to load: ${err.message}`;
@@ -102,6 +161,9 @@ function prepare(graph) {
   const FONT_STACK =
     '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 
+  graph.nodes.forEach((n, i) => {
+    n.driftPhase = i * 2.399963; // golden-angle spread so stars don't sync
+  });
   for (const n of graph.nodes) {
     n.r = RADII[n.type] || RADII.adjacent;
     n.rings = ringsFor(n, now, state.config);
@@ -133,6 +195,24 @@ function prepare(graph) {
         if (!state.neighborHubs.has(a.id)) state.neighborHubs.set(a.id, new Set());
         state.neighborHubs.get(a.id).add(b.id);
       }
+    }
+  }
+
+  // §4f sector assignment: data field wins, then the explicit map, then
+  // majority inheritance from connected hubs (two passes so hubs resolve
+  // before their satellites inherit).
+  for (const n of graph.nodes) {
+    if (!n.sector) n.sector = SECTOR_BY_NODE[n.id] || null;
+  }
+  for (const n of graph.nodes) {
+    if (n.sector) continue;
+    const counts = new Map();
+    for (const hubId of state.neighborHubs.get(n.id) || []) {
+      const s = state.nodesById.get(hubId)?.sector;
+      if (s) counts.set(s, (counts.get(s) || 0) + 1);
+    }
+    for (const [s, c] of counts) {
+      if (!n.sector || c > counts.get(n.sector)) n.sector = s;
     }
   }
 }
@@ -172,10 +252,28 @@ function render(graph) {
   svg.attr('viewBox', [0, 0, width, height]);
 
   const viewport = svg.append('g').attr('id', 'viewport').attr('class', 'zoomed-out');
+  const sectorLayer = viewport.append('g');
   const hullLayer = viewport.append('g');
   const linkLayer = viewport.append('g');
   const analogLayer = viewport.append('g');
   const nodeLayer = viewport.append('g');
+
+  // §4f sector geometry: a 3×2 grid centered on the canvas, in world coords
+  // (pans/zooms with the map). Sector force targets pull each node's settle
+  // position into its vertical's region; empty sectors still render.
+  const gridX0 = width / 2 - SECTOR_W * 1.5;
+  const gridY0 = height / 2 - SECTOR_H;
+  const sectorCenter = new Map(
+    SECTORS.map((s) => [
+      s.id,
+      { x: gridX0 + (s.col + 0.5) * SECTOR_W, y: gridY0 + (s.row + 0.5) * SECTOR_H },
+    ])
+  );
+  const sectorTarget = (d, axis) => {
+    const c = d.sector && sectorCenter.get(d.sector);
+    if (!c) return axis === 'x' ? width / 2 : height / 2;
+    return c[axis];
+  };
 
   // Structural analogs stay OUT of the layout links: not physical proximity,
   // not a persistent line (Section 6a.7).
@@ -213,7 +311,16 @@ function render(graph) {
               : 130
         )
         .strength((d) =>
-          d.relationship === 'parent_of' ? 0.9 : d.relationship === 'direct_competitor' ? 0.5 : 0.3
+          // §4f: a link SPANNING sectors is a trade route, not a spring — it
+          // must not drag its endpoints out of their home sectors. Same-sector
+          // links keep their structural strengths.
+          d.source.sector && d.target.sector && d.source.sector !== d.target.sector
+            ? 0.02
+            : d.relationship === 'parent_of'
+              ? 0.9
+              : d.relationship === 'direct_competitor'
+                ? 0.5
+                : 0.3
         )
     )
     .force(
@@ -225,8 +332,11 @@ function render(graph) {
     .force('collide', d3.forceCollide((d) => d.r + 8))
     .force('orbitExclusion', forceOrbitExclusion(families))
     .force('labelCollide', forceLabelCollide())
-    .force('x', d3.forceX(width / 2).strength(0.06))
-    .force('y', d3.forceY(height / 2).strength(0.06))
+    // §4f: the settle-time positional pull IS the sector force — each node
+    // gravitates toward its vertical's region, layered under the link/orbit
+    // forces. After settle, per-node anchors take over as before.
+    .force('x', d3.forceX((d) => sectorTarget(d, 'x')).strength(0.14))
+    .force('y', d3.forceY((d) => sectorTarget(d, 'y')).strength(0.14))
     .stop();
 
   // Deterministic settle: D3 seeds positions on a phyllotaxis spiral and the
@@ -306,6 +416,35 @@ function render(graph) {
     }
   }
   simulation.alpha(0);
+
+  /* §4f sector boundaries: faint grid lines + corner labels, no fills —
+     node fill color already carries relevance/identity meaning (§5/§5a). */
+  sectorLayer
+    .selectAll('line.sector-v')
+    .data([0, 1, 2, 3])
+    .join('line')
+    .attr('class', 'sector-line sector-v')
+    .attr('x1', (i) => gridX0 + i * SECTOR_W)
+    .attr('x2', (i) => gridX0 + i * SECTOR_W)
+    .attr('y1', gridY0)
+    .attr('y2', gridY0 + 2 * SECTOR_H);
+  sectorLayer
+    .selectAll('line.sector-h')
+    .data([0, 1, 2])
+    .join('line')
+    .attr('class', 'sector-line sector-h')
+    .attr('x1', gridX0)
+    .attr('x2', gridX0 + 3 * SECTOR_W)
+    .attr('y1', (i) => gridY0 + i * SECTOR_H)
+    .attr('y2', (i) => gridY0 + i * SECTOR_H);
+  sectorLayer
+    .selectAll('text')
+    .data(SECTORS)
+    .join('text')
+    .attr('class', 'sector-label')
+    .attr('x', (s) => gridX0 + s.col * SECTOR_W + 16)
+    .attr('y', (s) => gridY0 + s.row * SECTOR_H + 28)
+    .text((s) => s.label);
 
   /* dashed orbit paths behind the children (§6a.1, optional rendering) */
   const orbits = hullLayer
@@ -389,8 +528,11 @@ function render(graph) {
   // Default view = the whole settled map, fit with padding. Reset returns here.
   function fitTransform() {
     const pad = 60;
-    const xs = d3.extent(graph.nodes, (d) => d.homeX);
-    const ys = d3.extent(graph.nodes, (d) => d.homeY);
+    const nx = d3.extent(graph.nodes, (d) => d.homeX);
+    const ny = d3.extent(graph.nodes, (d) => d.homeY);
+    // Include the sector grid so empty sectors (Sports, CPGs) stay on-chart.
+    const xs = [Math.min(nx[0], gridX0), Math.max(nx[1], gridX0 + 3 * SECTOR_W)];
+    const ys = [Math.min(ny[0], gridY0), Math.max(ny[1], gridY0 + 2 * SECTOR_H)];
     const dx = xs[1] - xs[0] + pad * 2;
     const dy = ys[1] - ys[0] + pad * 2;
     const k = Math.min(width / dx, height / dy, 1.4);
@@ -420,6 +562,19 @@ function render(graph) {
   }
   simulation.on('tick', ticked);
   ticked();
+
+  // §5c ambient drift: a continuous render loop layering a tiny sinusoidal
+  // offset onto each node's true position. The simulation's coordinates are
+  // never touched — this is the "stars drift gently at rest" effect.
+  if (DRIFT_AMPLITUDE > 0) {
+    d3.timer((t) => {
+      node.attr('transform', (d) => {
+        const dx = DRIFT_AMPLITUDE * Math.sin(t * DRIFT_SPEED + d.driftPhase);
+        const dy = DRIFT_AMPLITUDE * Math.cos(t * DRIFT_SPEED * 0.83 + d.driftPhase * 1.7);
+        return `translate(${d.x + dx},${d.y + dy})`;
+      });
+    });
+  }
 
   /* lens toggle: visibility treatment only — nodes never move (Section 4) */
   document.querySelectorAll('#lens-toggle button').forEach((btn) => {
@@ -718,6 +873,8 @@ function showPanel(d) {
   parts.push(`<h2>${esc(d.name)}</h2>`);
   const sub = [d.type === 'hub' ? 'G7 client hub' : d.type === 'parent' ? 'Corporate parent' : 'Adjacent brand'];
   if (d.category) sub.push(esc(d.category));
+  const sector = SECTORS.find((s) => s.id === d.sector);
+  if (sector) sub.push(esc(sector.label));
   parts.push(`<div class="subtitle">${sub.join(' · ')}</div>`);
 
   const badges = [];
