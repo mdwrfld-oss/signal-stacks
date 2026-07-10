@@ -28,8 +28,9 @@ body { display: flex; flex-direction: column; }
 
 #toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 20px;
+  gap: 10px 20px;
   padding: 10px 16px;
   background: var(--g7-purple);
   color: #fff;
@@ -53,8 +54,9 @@ body { display: flex; flex-direction: column; }
   padding: 1px 8px;
 }
 
-#lens-toggle { display: flex; border-radius: 8px; overflow: hidden; }
-#lens-toggle button {
+#lens-toggle, #filter-toggles { display: flex; border-radius: 8px; overflow: hidden; }
+#filter-toggles { gap: 1px; }
+#lens-toggle button, #filter-toggles button {
   border: none;
   padding: 6px 14px;
   background: rgba(255, 255, 255, 0.14);
@@ -62,7 +64,7 @@ body { display: flex; flex-direction: column; }
   cursor: pointer;
   font-size: 13px;
 }
-#lens-toggle button.active { background: #fff; color: var(--g7-purple); font-weight: 600; }
+#lens-toggle button.active, #filter-toggles button.active { background: #fff; color: var(--g7-purple); font-weight: 600; }
 
 #controls { margin-left: auto; display: flex; gap: 8px; }
 #search {
@@ -148,16 +150,22 @@ body { display: flex; flex-direction: column; }
 .ring-label.rfp { fill: var(--ring-rfp); }
 .ring-label.new { fill: var(--ring-new); }
 
+/* §5d typography hierarchy: G7's own roster (hubs/parents) reads prominent;
+   competitor/adjacent entities are permanently subordinate — reinforcing the
+   same hierarchy as the purple-vs-gray fill (§5a) and glow (§5b/§5c). */
 .node-label {
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 600;
   fill: #d6d0e8;
   paint-order: stroke;
   stroke: rgba(13, 11, 26, 0.9);
   stroke-width: 3px;
   pointer-events: none;
 }
-.node-label.adjacent-label { font-size: 9px; fill: #8f87ad; }
+.node-label.adjacent-label { font-size: 7.5px; font-weight: 400; fill: #8f87ad; }
 .zoomed-out .adjacent-label { display: none; }
+/* §4g competitor-dim: labels fully hidden, not faded. */
+.competitors-hidden .adjacent-label { display: none !important; }
 
 /* Lens dimming: switched-off, not removed (Section 4). */
 .dimmed { opacity: 0.1; filter: grayscale(0.85); transition: opacity 0.25s; }

@@ -29,7 +29,10 @@ Google Sheet (private, Service Account)          Seed JSON (bundled fallback)
   B2B, CPGs, Sports, Hospitality/Travel/Tourism) as faint grid regions each
   pulling its member nodes' settle positions — cross-sector edges render as long
   "trade routes" without dragging nodes out of their vertical;
-  anchored force layout with lens dimming (§4), fluid drag
+  anchored force layout with lens dimming (§4) plus §4g signals-only and
+  competitor-dim toggles (all filters compose multiplicatively; competitor-dim
+  hides adjacent labels outright), §5d label hierarchy (adjacent labels
+  permanently subordinate to the G7 roster), fluid drag
   with snap-to-grid-and-stay on release (§4c — nearest unoccupied cell, persisted
   per-browser; "Reset layout" clears), always-on label bounding-box collision (§4d),
   pan/zoom + reset (§4a), ring/fill/floor grammar with the G7-client purple base

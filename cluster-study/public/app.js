@@ -99,6 +99,8 @@ const state = {
   graph: null,
   config: DEFAULT_CONFIG,
   lens: 'all',
+  signalsOnly: false, // §4g
+  dimCompetitors: false, // §4g
   selected: null,
   k: 1,
   effective: new Map(),
@@ -173,7 +175,8 @@ function prepare(graph) {
 
     // §4d collision box: node circle + ring stack + label, as one AABB.
     // Text is wider than the circle it hangs from, so the box is label-driven.
-    measureCtx.font = `${n.type === 'adjacent' ? 9 : 11}px ${FONT_STACK}`;
+    // Fonts mirror the §5d hierarchy in style.css.
+    measureCtx.font = n.type === 'adjacent' ? `7.5px ${FONT_STACK}` : `600 12px ${FONT_STACK}`;
     n.labelW = measureCtx.measureText(n.name).width;
     const ringExtent = n.r + RING_GAP * n.rings.length;
     const labelBottom = ringExtent + 12 + 4; // label baseline (+12) plus descent
@@ -576,27 +579,43 @@ function render(graph) {
     });
   }
 
-  /* lens toggle: visibility treatment only — nodes never move (Section 4) */
+  /* §4g combined filters: lens + signals-only + competitor-dim compose
+     multiplicatively — a node renders at full strength only if it passes
+     EVERY active filter. Visibility treatment only; nodes never move (§4). */
+  function passes(n) {
+    if (!inLens(n, state.lens)) return false;
+    if (state.signalsOnly && !n.signal) return false; // active signal ring
+    if (state.dimCompetitors && n.type === 'adjacent') return false;
+    return true;
+  }
+
+  function applyFilters() {
+    node.classed('dimmed', (d) => !passes(d));
+    link.classed('dimmed', (d) => !passes(d.source) || !passes(d.target));
+    orbits.classed('dimmed', (d) => ![d.parent, ...d.children].some((m) => passes(m)));
+    // Competitor-dim hides adjacent labels entirely (§4g: decluttered view,
+    // not a partial one) — the circles dim, the labels go away.
+    viewport.classed('competitors-hidden', state.dimCompetitors);
+  }
+
   document.querySelectorAll('#lens-toggle button').forEach((btn) => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('#lens-toggle button').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
       state.lens = btn.dataset.lens;
-      applyLens();
+      applyFilters();
     });
   });
-
-  function applyLens() {
-    node.classed('dimmed', (d) => !inLens(d, state.lens));
-    link.classed(
-      'dimmed',
-      (d) => !inLens(d.source, state.lens) || !inLens(d.target, state.lens)
-    );
-    orbits.classed(
-      'dimmed',
-      (d) => ![d.parent, ...d.children].some((m) => inLens(m, state.lens))
-    );
-  }
+  document.getElementById('toggle-signals').addEventListener('click', (e) => {
+    state.signalsOnly = !state.signalsOnly;
+    e.currentTarget.classList.toggle('active', state.signalsOnly);
+    applyFilters();
+  });
+  document.getElementById('toggle-competitors').addEventListener('click', (e) => {
+    state.dimCompetitors = !state.dimCompetitors;
+    e.currentTarget.classList.toggle('active', state.dimCompetitors);
+    applyFilters();
+  });
 
   /* selection-triggered structural analog highlight (Section 6a.7) */
   function updateAnalogLines() {
@@ -663,7 +682,7 @@ function render(graph) {
     e.target.blur();
   });
 
-  applyLens();
+  applyFilters();
 
   // Debug hook for force-tuning sessions (harmless in production).
   window.__cluster = { state, simulation };

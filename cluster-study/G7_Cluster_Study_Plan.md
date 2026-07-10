@@ -64,6 +64,14 @@ New spatial layer, proposed alongside the stellar-cartography aesthetic directio
 - **CPGs is scoped to non-food packaged goods** — skincare, toys, household products, etc. — distinct from Food & Beverage. Given the current roster, this means every current beverage/spirits hub node (White Claw, Mike's Hard Lemonade, Cayman Jack, Olé, Fireball, Liquid Death, Lagunitas, Mojo Energy) belongs in **Food & Beverage**, and **CPGs currently has no hub node**, same as Sports.
 - **Empty sectors (Sports, CPGs) are fine for now** — not a bug, just reflects where G7's current roster actually sits. Both sectors still render as defined regions on the sector chart, ready to receive nodes as the roster grows.
 
+### 4g. Additional view toggles (added this session)
+Two new toggles, layered onto the existing Experiential/Talent lens (Section 4) as independent, combinable filters rather than replacements for it:
+
+- **Signals-only toggle:** dims every node without an active signal (no ring present), leaving only signaled nodes at full strength. Must combine with the existing lens rather than override it — e.g., "Signals-only + Talent" shows only nodes that are both in the Talent lens *and* currently signaled, at full opacity; everything else dims.
+- **Competitor-dim toggle:** dims competitor/adjacent nodes for a cleaner view focused on G7's own roster. When active, competitor **labels are fully hidden** (not just faded), not merely dimmed like the lens treatment — the intent is a decluttered view, not a partial one.
+
+**Combination logic:** all active filters apply multiplicatively — a node renders at full strength only if it passes every currently-active filter (lens, signals-only, competitor-dim); otherwise it dims. This keeps the three toggles composable rather than needing special-cased interactions between them.
+
 ## 5. Visual grammar — resolved to a two-state color model (revised this session)
 
 Originally proposed as three-plus color states (recency-fading gray for "aware but thin," green for client status with its own fade, plus the floor state). After working through the philosophical question of what Cluster is *for* (Section 2, principle 6), this collapsed back to two states:
@@ -101,6 +109,9 @@ Overall visual direction, inspired by astronomy charts / Star Trek-style stellar
 - **Edges as faint "trade routes"** — thin, slightly luminous lines rather than plain strokes; the structural-analog selection-highlight (6a.7) fits naturally as a "warp lane" motif that only appears on demand
 - **Sector boundaries (4f) as faint grid lines with corner labels**, not solid fills, consistent with keeping node fill color free to carry relevance/identity meaning
 - **Revisits the open idle-drift question (4b):** this aesthetic is the strongest argument yet for subtle ambient motion at rest — stars drift gently in every reference for this style, and the mechanism already exists via the anchor-force system, so this may now be worth resolving in favor of "yes, drift" rather than leaving it open indefinitely
+
+### 5d. Label typography hierarchy (added this session)
+Permanent style change, independent of the competitor-dim toggle (4g) — competitor/adjacent node labels render **significantly smaller** than client/hub node labels by default, establishing a clear graphic hierarchy where competitor entities are visually subordinate to G7's own roster at all times, not just when the competitor-dim toggle is active. Pairs with the existing purple-vs-gray (5a) and drop-shadow (5b) distinctions — all three should reinforce the same hierarchy (client entities prominent, competitor entities present but secondary) rather than any one of them working against the others.
 
 ## 6. RFP tracker as a scoring input (revised this session — no longer a displayed status type)
 
