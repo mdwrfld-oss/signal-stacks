@@ -148,6 +148,20 @@ npx wrangler kv key put graph:data --path /tmp/graph.json \
 Note: the next Sheet cron ingestion (once secrets exist) will overwrite this
 KV entry — the CSV pass is a demo bootstrap, not the live pipeline.
 
+## Standalone export (offline demo file)
+
+```sh
+node scripts/export-standalone.mjs        # → export/index.html
+```
+
+Bundles the frontend into ONE self-contained HTML file that opens directly
+from disk (double-click; `file://` works) — D3, styles, all JS, and the graph
+JSON inlined (pulled from the live `/data` when reachable, else the bundled
+seed). No dev server, no network, no Worker. View-only: the RFP pipeline and
+Sheet ingestion stay in the Worker. Drag/snap persistence still works.
+Re-run the script whenever the data or frontend changes; the export is a
+snapshot, not a live view.
+
 ## Deploy
 
 ```sh

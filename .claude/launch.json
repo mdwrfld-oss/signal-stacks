@@ -2,6 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "standalone-export",
+      "runtimeExecutable": "/Users/Matt.Weiner/.nvm/versions/node/v22.23.1/bin/node",
+      "runtimeArgs": ["cluster-study/scripts/static-server.mjs", "8790", "cluster-study/export"],
+      "port": 8790
+    },
+    {
       "name": "cluster-study",
       "runtimeExecutable": "/Users/Matt.Weiner/.nvm/versions/node/v22.23.1/bin/node",
       "runtimeArgs": [
