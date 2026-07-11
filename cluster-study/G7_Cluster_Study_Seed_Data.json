@@ -28,10 +28,11 @@
     ],
     "vertical_notes": "cpgs and sports currently have no hub nodes — both are real, defined sectors awaiting future roster additions, not errors.",
     "ring_types": {
-      "signal": "teal — unified ring for Signal Stacks detection and RFP-sourced events",
-      "sister_agency": "yellow — Project Worldwide sister-agency relationship"
+      "signal": "teal — unified ring for Signal Stacks detection and RFP-sourced events (v1 build only; re-evaluate under Map Engine v2's white/gray glow model)",
+      "sister_agency": "#B83A1A (G7 red) — Project Worldwide sister-agency relationship"
     },
-    "new_addition_treatment": "pulsing glow (brighter + slow pulse) for first week, not a separate ring type"
+    "new_addition_treatment": "pulsing glow (brighter + slow pulse) for first week, not a separate ring type",
+    "map_engine_v2_status": "Planned as a separate v2 branch/rebuild. See G7_Cluster_Study_Plan.md Part II. Cultural verticals list (11, subject to revision): music_performance, sports, gaming, comedy, festival, talent_celebrity_partnerships, film_tv_inclusion, college_marketing, outdoor_adventure, inter_brand_collaborations, creator_influencer_partnerships, wellness_fitness. Business verticals list needs revisiting as weighted wells rather than single-assignment categories. Hub nodes do NOT yet have cultural_verticals or re-scored business_verticals fields — that data entry is future work once the v2 branch starts."
   },
   "hub_nodes": [
     {

@@ -42,11 +42,15 @@ D3's built-in `d3.zoom()` provides pan (click-drag) and zoom (scroll/pinch) over
 Zoom also directly resolves the ring-density question from Section 9 — see the note there.
 
 ### 4b. Draggable nodes with return-to-home (added this session)
+**⚠ SUPERSEDED — see Part II, Section II.5.** Permanent dragging is reversed; positions become fixed once they carry vertical-score meaning. Left here for historical context only; do not build against this section.
+
 Inspired directly by Obsidian's graph view. Nodes can be grabbed and dragged to temporarily rearrange the map — neighboring nodes respond naturally via the existing link/charge/collision forces during the drag, same visual language as Obsidian — and on release, the anchor force (4, above) eases the node back to its default position rather than leaving it wherever it was dropped. This gives users a way to manually declutter or explore a dense area (e.g., pulling the Mark Anthony Brands hull apart to see it more clearly) without permanently disrupting the layout others rely on for spatial memory.
 - **Estimated add: 4–7 hours** on top of core mechanics — anchor-force setup/tuning, drag handlers, making hull boundaries (6a.1) and connector lines recompute live during a drag rather than only rendering once, and general smoothness tuning.
 - **Not yet decided:** whether a subtle idle drift (very low-amplitude motion around the home position, distinct from drag) is worth adding for the "alive" feel Obsidian has at rest, or whether the anchor force should hold nodes fully still until actively dragged. Low-cost either way; worth deciding once the core drag mechanic is working and can be felt rather than imagined.
 
 ### 4c. Snap-to-grid dragging (added this session, from live-build feedback)
+**⚠ SUPERSEDED — see Part II, Section II.5.** Permanent user repositioning of any kind is reversed. Left here for historical context only; do not build against this section.
+
 On release (not mid-drag, to keep movement fluid), a dragged node snaps to the nearest **unoccupied** point on an invisible positioning grid — similar to icon repositioning on a desktop OS. Nearest-point snapping alone isn't sufficient, since it can collide two nodes into the same cell; snap logic needs an occupancy check with fallback to the next-nearest free cell. Grid spacing should be tied to typical node radius/label width so cells are meaningfully spaced apart. Estimated: 2–3 hours.
 
 ### 4d. Label and node collision avoidance (added this session, from live-build feedback)
@@ -56,6 +60,8 @@ Distinct from 4c — this needs to be **always-on**, not just a response to manu
 Default spacing between distinct clusters (each parent-family group, and each standalone hub node) should start with more breathing room — a global tuning pass on repulsion/link-distance forces rather than a new mechanic. **Estimated: ~1 hour.**
 
 ### 4f. Vertical sectors (added this session)
+**⚠ SUPERSEDED — see Part II, Sections II.1–II.2.** Single-vertical-per-node sector assignment is replaced by weighted multi-vertical scoring across two separate maps. Left here for historical context only; do not build against this section.
+
 New spatial layer, proposed alongside the stellar-cartography aesthetic direction (5c): six verticals — Food & Beverage, Automotive & Transportation, Technology & B2B, CPGs, Sports, Hospitality/Travel/Tourism — each occupying a defined region of the canvas, similar to quadrants on a star chart.
 
 **Resolved approach: true spatial sectors, not just background tinting.** Each node's anchor position (4) is pulled toward its vertical's sector region via an additional force, layered on top of the existing anchor-to-home and orbit-around-parent forces. This is the more literal match for the astronomical reference and produces a genuinely useful side effect: a `direct_competitor` edge staying within one sector is visually unremarkable (expected), while an `analogous_audience` edge stretching *across* sectors becomes a visible signal in its own right — e.g., a future Subaru → outdoor-lifestyle-brand connection reading as a visible "trade route between different customer galaxies," which is exactly the kind of parallel-lane insight Cluster exists to surface. Sector boundaries render as faint grid/quadrant lines with small corner labels, not solid color fills — solid fills would compete with node fill color, which already carries relevance/identity meaning (Sections 5, 5a).
@@ -96,6 +102,8 @@ Exponential falloff (e.g., halving every N weeks) rather than a hard cutoff — 
 **Value of the floor state:** floor-state nodes (Namco-style pure theoretical analogs, no live signal) are what make a broader "show all plausible brands in the space" view viable — useful for cold outreach or general environmental/category context — without every node needing to justify its presence with a real signal.
 
 ### 5a. Client identity marker (added this session, from live-build feedback)
+**⚠ SUPERSEDED — see Part II, Section II.3.** Purple-as-client-identity is replaced by white (client) / medium gray, fading with age (signal) — purple is now reserved as the Business Landscape's selection/lens accent color, not a base fill. Left here for historical context only; do not build against this section.
+
 The first live build rendered every node in floor-gray by default, which surfaced a real gap: a genuine G7 client shouldn't be visually indistinguishable from a random competitor node just because Signal Stacks hasn't detected a live signal about it yet. Resolved: any node that is a **real, confirmed G7 client relationship** gets a base fill of G7 purple — always, regardless of live-signal status — with the existing relevance formula (signal_strength × recency decay) still modulating *shade within that purple family*. Floor-gray is reserved strictly for nodes that are not G7 clients (competitors, analogs, corporate parents that aren't themselves direct clients).
 
 **Confirmed owned-client list (13):** Cayman Jack, Mike's Hard Lemonade, White Claw, Fireball Whiskey, Liquid Death, Mojo Energy, Ram Trucks, Lagunitas, Subaru, Jackson Hole Mountain Resort, Atlassian, Workday, Cisco. TurboTax/Intuit remains floor-gray given its lapsed status. Implemented as `is_g7_client` (boolean) on every hub node in the seed JSON.
@@ -105,7 +113,9 @@ The first live build rendered every node in floor-gray by default, which surface
 **What happens when a current client gets a Signal marker (answered this session):** nothing special — clients follow the exact same overlay logic as any other node, they just start from a purple floor instead of a gray one. A signal on an owned client: (1) activates its ring, same mechanism as any signaled node, and (2) darkens its fill further within the purple family per the existing relevance formula. The client identity marker never gets overridden or replaced by a live signal — it's a permanent base layer that live signals layer on top of, not a competing state.
 
 ### 5a.1 Sister-agency ring — unblocked with real examples (added this session)
-Data Blocker #3 (Section 7) required a sourced sister-agency client list before this ring type could go live. Two confirmed examples now exist directly from the user: **Subaru and Lagunitas** are sister-agency clients (Project Worldwide relationships), and should render with a **yellow ring** — updates the earlier prototype's placeholder blue to yellow as the actual color. Implemented as a `sister_agency: true` flag on both hub nodes in the seed JSON. This doesn't fully clear Data Blocker #3 (the full Project Worldwide client list is still unsourced), but it's enough real data to make the ring type demonstrable rather than purely theoretical.
+**Resolved this session:** ring color set to G7's red brand color, `#B83A1A` — clears the yellow conflict with the Cultural Landscape's accent color (Part II, II.3).
+
+Data Blocker #3 (Section 7) required a sourced sister-agency client list before this ring type could go live. Two confirmed examples now exist directly from the user: **Subaru and Lagunitas** are sister-agency clients (Project Worldwide relationships), and should render with a **red ring (`#B83A1A`)**. Implemented as a `sister_agency: true` flag on both hub nodes in the seed JSON. This doesn't fully clear Data Blocker #3 (the full Project Worldwide client list is still unsourced), but it's enough real data to make the ring type demonstrable rather than purely theoretical.
 
 ### 5b. Drop shadows for parent and client nodes only (added this session, from live-build feedback)
 Subtle drop shadows applied to parent entity nodes (Mark Anthony Brands, Intuit, Swisher) and owned-client nodes (`is_g7_client: true`) — reinforces the same distinction as the purple identity marker (5a), giving real G7 relationships and their organizing parents a slight visual "lift" off the canvas. Competitor/adjacent nodes and floor-state nodes stay flat, no shadow — keeps the visual hierarchy consistent with the color distinction rather than working against it. **Estimated: ~1 hour.**
@@ -148,6 +158,8 @@ Prompted by a real case: Pringles (a real G7 relationship) is owned by Kellogg's
 **Unifying insight:** this is structurally the same problem as the sister-agency warm-path signal (Flag 1) and conceptually similar to LinkedIn's tiered-connection display — in all three cases, relevance should propagate outward from a known point through real relationship structure, at reduced confidence per hop. Worth treating this as one general **"connection distance"** mechanism rather than three separate features that happen to look similar. Parent/subsidiary corporate structure and sister-agency client relationships are two concrete instances of the same underlying pattern.
 
 ### 6a.1 Visual treatment — orbital layout (revised this session, from live-build feedback)
+**⚠ SUPERSEDED — see Part II, Section II.4.** Fixed single-radius orbital slots are replaced by independently-computed child positions plus concentric distance rings as a visual aid; the parent's position becomes the centroid of its children. Left here for historical context only; do not build against this section.
+
 **Original approach (superseded):** a convex-hull boundary (`d3.polygonHull()`) drawn around a parent and its children. In practice, this produced tangled connector lines and label crowding around the parent (visible directly in the first build's Mark Anthony Brands cluster).
 
 **Revised approach:** children render in an **orbital layout** — fixed angular slots around the parent at a defined radius, similar to a solar-system diagram, rather than a loose blob boundary. This is inherently tidier: each child has a defined "slot" rather than competing for space wherever the force simulation happens to settle it, and it reads more immediately as "these belong to this parent" than a soft boundary does. An optional dashed orbit-path circle can render behind the children for additional visual clarity, echoing the reference diagram style.
@@ -157,15 +169,21 @@ Prompted by a real case: Pringles (a real G7 relationship) is owned by Kellogg's
 **Estimated: 4–6 hours** — radial positioning logic to replace the hull, larger-radius scaling rule, optional orbit-path rendering.
 
 ### 6a.1a Orbit exclusion zone (added this session, from live-build feedback)
+**⚠ SUPERSEDED — see Part II, Section II.4.** A single-radius exclusion boundary doesn't translate to the new concentric/independent-position model; needs fresh design once II.4 is actually rendered. Left here for historical context only.
+
 A real problem surfaced in the live build: competitor/adjacent nodes belonging to a *child* (e.g., Twisted Tea, orbiting near Mike's Hard Lemonade) were visually falling inside the parent's orbit ring — implying they're affiliated with the parent (Mark Anthony Brands) itself, which is false and actively misleading. **Resolved:** the parent's orbit radius acts as an exclusion boundary — any non-family node (a competitor/adjacent node not belonging to this parent's cluster) that falls within that radius gets pushed outward until it clears the boundary, similar to a collision force against a fixed circular obstacle rather than another node. This needs to apply per parent cluster (Mark Anthony Brands, Intuit, Swisher each maintain their own exclusion zone). **Estimated: 2–3 hours**, layered onto the orbital layout work above.
 
 ### 6a.1b Orbit-locked dragging for child entities (added this session, from live-build feedback)
+**⚠ SUPERSEDED — see Part II, Sections II.4–II.5.** Both the fixed-radius orbit concept and permanent dragging itself are reversed. Left here for historical context only; do not build against this section.
+
 Refines the general draggable-node behavior (4b) specifically for children within an orbital group. A child can be dragged **around** its parent's orbit path — angular position changes freely during drag — but not permanently pulled closer to or farther from the parent than the orbit radius allows. On release, if the drop point isn't exactly on the orbit circle, the child snaps to the **closest point on its parent's orbit radius** (project the drop position onto the circle, preserving the angle, normalizing the distance) rather than back to its original angular slot. This lets a user reorder or spread out children around a crowded parent (useful for the Mark Anthony Brands cluster specifically) without ever letting a child drift away from or into the parent entirely.
 
 ### 6a.2 New edge type
 `parent_of` / `subsidiary_of` — distinct from `direct_competitor` and `analogous_audience`, since it's a structural relationship, not a competitive or audience one.
 
 ### 6a.3 Signal propagation — three-step schema (resolved this session)
+**⚠ NEEDS RE-EXPRESSION — see Part II, Section II.3.** The underlying concept (reduced-intensity propagation to parent/siblings) is still valid, but the multipliers below were defined against purple fill-darkness, a channel that no longer exists in the new white/gray glow model. Re-express in terms of gray-glow opacity before implementing.
+
 Rather than continuous decay by hop distance (harder to read), propagation uses three discrete steps:
 
 | Step | State | Multiplier applied to the source node's current relevance score |
@@ -218,6 +236,111 @@ New interactive feature for the click-through detail panel: for **Signal-sourced
 **Infrastructure note:** this needs a backend proxy, not a direct client-side API call — an exposed API key in frontend code is a real security problem, not just a style preference. G7 already has the right pattern for this: reuse the same Cloudflare Worker proxy approach already running for Scout (`scoutproxy.matt-weiner-5c1.workers.dev`) rather than building new infrastructure from scratch. The Worker receives the brand name, runs the Claude API + web search call server-side, and returns structured results to the frontend.
 
 **Relationship to 6.1:** this is functionally the same lookalike-search mechanism already designed for RFP-triggered lookalike search (6.1), just re-triggered manually from the UI per-node rather than automatically from an RFP event. Worth building the underlying search/classification logic once and calling it from both triggers, rather than maintaining two separate implementations.
+
+## 6d. Easter egg — idle starship (added this session, low priority, bundle into a future build pass)
+
+Purely optional visual polish, fully decoupled from the data/simulation logic — safe to defer indefinitely without blocking anything else.
+
+**Behavior:**
+- After a period of user inactivity (mouse/keyboard/click), a small ship drifts slowly between random points on the visible canvas, through the empty space between entities — fits the stellar-cartography aesthetic (5c) as "something out there in the dark."
+- On any user activity resuming (mousemove, click, keypress), the ship "goes to warp" — a fast, elongated streak (scale/blur toward its direction of travel) that rockets off-screen in well under a second, then gets removed.
+
+**Asset:** the user has a file, `Enterprise.png`, to use for the ship — reference it directly (`<img>` or SVG `<use>`) rather than generating a replacement. **Sizing:** small, but not so small the ship is unrecognizable — should read clearly as a ship silhouette at a glance, not just a nondescript dot.
+
+**Copyright note for future reference:** the Enterprise design is Paramount/CBS-owned IP. For this tool's current scope — internal only, ~10 users — practical risk is negligible and the user has confirmed they're comfortable with it. Worth reconsidering if this tool's audience or visibility ever expands beyond the current internal, small-scale use (e.g., external demos, wider company rollout, public screen-shares).
+
+**Estimated: 2–3 hours.** Bundle into a future instruction set alongside other pending revisions rather than shipping standalone.
+
+## PART II: Map Engine v2 — Dual Gravity-Well Maps (added this session)
+
+Prompted by a separate ideation conversation working through how to make Cluster genuinely distinctive as an NBD tool rather than a prettier CRM. This is a foundational change to what "position" means, not an additive feature — several Part I decisions are directly superseded (flagged at the relevant Part I subsections) rather than layered on top of.
+
+### II.1 Data model: weighted vertical scoring, not single categorical assignment
+Each hub node's single `vertical` field (Part I, 4f) is replaced by two scored objects — every entity gets a **0–5 score against every vertical**, not one assigned category:
+```
+business_verticals: { food_beverage: 5, entertainment: 1, retail: 1, ... }
+cultural_verticals: { music: 4, sports: 5, gaming: 3, ... }
+```
+**Storage resolved:** stored internally as normalized 0–100% weights, displayed to users as 0–5. A hybrid brand (e.g., Liquid Death: Food & Beverage 5, Entertainment 3–4) naturally sits between wells rather than being forced into one category — this is the mechanism that makes position meaningful rather than arbitrary.
+
+**Business vs. cultural profile split (agreed, mechanism confirmed this session):** deliberately treated as two separate, independently-scored profiles — what a company *sells* vs. how it *behaves as a marketer*. The split is somewhat arbitrary at the edges by nature, and is handled by a new **LLM search-and-analysis enrichment layer** applied to every entity (and every Signal Stacks–surfaced signal) before induction into Cluster — see II.8 and II.11.
+
+### II.2 Two maps, same entities, two positions
+- **Business Landscape** — position = weighted average toward fixed business-vertical well anchors. Answers "what does this company do."
+- **Cultural Landscape** — position = weighted average toward fixed cultural-vertical well anchors (Music, Sports, Comedy, Gaming, etc. — list still pending, II.10). Answers "how does this company behave as a marketer."
+- **Same underlying node set, relationships, and click-through data** — only the computed coordinate changes. A map toggle animates every node flying between its two positions; the *distance* a node travels between maps is itself informative (a beverage company that barely moves is conventional; one that flies toward the Cultural map's Music/Entertainment wells is behaving unusually for its category).
+- **Gravity wells are attractors, not filled/labeled regions by default** — unlabeled ambient influence points; a well's field becomes visible (labeled, with concentric influence rings) only when a user selects it, per II.3.
+- **This replaces Part I 4f's single-sector-force model entirely** — see the flag at 4f.
+
+### II.3 Color/glow model (resolved this session — replaces Part I 5a/5c's color scheme)
+- **Background:** black with subtle stars, **identical in both maps** — no purple-vs-yellow theme split between the two maps. This supersedes the earlier "purple business map / yellow cultural map background" idea from the ideation conversation.
+- **G7 clients:** glow **white**.
+- **Signaled entities (non-client, has an active signal):** glow **medium gray**, fading (lower opacity) as the signal ages — consistent with the existing recency-decay principle, just re-expressed as glow opacity rather than the old purple fill-darkness gradient.
+- **Selection accent:** a selected entity glows **purple in the Business Landscape, yellow in the Cultural Landscape** — the map's identity color now lives in interaction feedback, not in the base palette.
+- **Vertical-lens illumination:** selecting a well (e.g., "Music") lights up the affected network in that map's accent color, saturation scaled to each entity's affinity score for that well — same mechanism the ideation conversation described, just recolored to match the map's own accent rather than a separate red/pink scale.
+
+**Resolved this session:** the Sister-agency ring (Part I, 5a.1) is set to G7's red brand color, `#B83A1A` — clears the conflict with yellow now being the Cultural map's own accent.
+
+**Also needs reconciliation, not yet decided:**
+- **Floor-state nodes** (no client, no signal at all) — what do they glow, if anything, under this new white/gray model? Not specified this session.
+- **Drop shadows (Part I 5b)** — may be redundant now that white/gray glow itself carries the "lift" the shadow was doing. Worth deciding once both are visible together rather than assuming.
+- **Existing Signal ring / propagation multipliers (Part I 6a.3, three-step 1.0/0.5/0.25 schema)** — conceptually still valid (a signal on a child should still propagate reduced intensity to its parent/siblings), but needs re-expression in terms of gray-glow opacity rather than purple fill-darkness, since that channel no longer exists in this model.
+
+### II.4 Family/orbit rendering — concentric rings, not a single fixed-radius orbit (revised this session)
+**Superseded:** Part I 6a.1's fixed angular slot at one orbit radius, and 6a.1a's single-radius exclusion zone, and 6a.1b's orbit-locked dragging — none of these survive as specified, since children no longer share one orbit radius.
+
+**New model:** each child gets its own **independent semantic position** from its own vertical scores (II.1) — a Mark Anthony Brands child could land anywhere on the map depending on its own profile, not confined to a fixed ring around the parent. Since the parent (Mark Anthony Brands, Intuit, Swisher) likely has no strong identity of its own, **the parent's position is the centroid — the average — of all its children's positions**, recalculated per map (a parent's Business Landscape position and Cultural Landscape position are two different centroids, computed independently). Family grouping is then visualized as **concentric distance rings** around that centroid — similar to a solar system's varying orbital rings — purely as a rendering aid showing "these are siblings, at their true, independently-computed distances from their shared center," not as a mechanism that determines position.
+
+**Needs fresh design work, not carried over from the old model:** the exclusion-zone concept (6a.1a) doesn't translate cleanly to a multi-radius concentric system — worth revisiting once this is actually rendered rather than guessing at a replacement now.
+
+### II.5 Dragging policy — fixed positions, no permanent repositioning (resolved this session)
+**Superseded:** Part I 4b (draggable nodes with return-to-home) and 4c (snap-to-grid) are both reversed. Once position carries real analytical meaning (II.1–II.2), permanent user repositioning would corrupt that meaning — a user couldn't tell whether two nodes are adjacent because of genuine business/cultural similarity or because someone dragged one for readability.
+- Positions become **fixed**, computed entirely from vertical scores (plus the family-centroid adjustment, II.4).
+- Temporary inspection dragging (an "elastic tether" — pull a node to see it more clearly, it springs back on release or reload, never saved) remains a reasonable option if crowding becomes a real problem, but this is not a commitment yet — pan/zoom (Part I 4a, still valid) may be sufficient on its own.
+- **4d (label/node collision avoidance) and 4e (cluster spacing tuning) are unaffected by this change** — both remain necessary regardless of how position is computed, since labels can still collide even at fixed coordinates.
+
+### II.6 Signal vectors (arrows) — resolved decay schedule
+A new signal (e.g., a musician partnership) creates a temporary directional arrow toward the relevant cultural well, separate from and prior to any change to the entity's actual identity score — prevents one announcement from overcorrecting a stable position.
+
+**Decay schedule (resolved this session):** arrows decay in **4-week (monthly) increments, across 6 levels** — a 24-week (6-month) total window, each level presumably a step down in arrow brightness/length/opacity. **After 6 months, a similar signal recurring is treated as a fresh, isolated one-off** — it does not inherit or build on the prior arrow's accumulated momentum. Sustained signals *within* that 6-month window (multiple reinforcing events) are what should eventually promote an arrow into an actual identity-score change, not a single event at any point.
+
+**Not yet decided:** the exact shape of the 6 levels (linear step-down vs. front-loaded/back-loaded), and whether decay rate should vary by signal type (a music partnership vs. a CMO hire plausibly decay differently) — flagged as a future refinement, not blocking.
+
+### II.7 G7 Gravity score
+A computed 0–100 "how strategically relevant, commercially plausible, and timely is this company for G7 right now" score, shown in the click-through panel alongside a factor breakdown (capability fit, recent momentum, commercial potential, relationship access, lookalike strength, opportunity timing) minus a constraint penalty (COI, entrenched agency, procurement friction), plus trend/trajectory (rising/stable/falling, with a primary driver noted).
+
+**Formula status — explicitly a first draft, not a launch commitment.** Proposed starting weights (capability fit 25%, momentum 20%, commercial potential 15%, relationship access 15%, lookalike strength 10%, opportunity timing 15%, minus up to 25 penalty points) are logged for future tuning against real outcomes, not treated as settled. **Added to the future-revisit list** — see Section 12-style flags, below.
+
+### II.8 Business vs. cultural classification pipeline
+Confirmed mechanism: an **LLM search-and-analysis layer** assesses every entity (and every Signal Stacks–surfaced signal) against both the business-vertical and cultural-vertical taxonomies before it's inducted into Cluster or its scores are updated. This is real research work per entity (sponsorship history, festival activity, talent partnerships, product-line composition), not a lookup — see II.11 for what this means for the Signal Sweep pipeline specifically.
+
+### II.9 Landmarks — removed
+The ideation conversation's "fixed cultural landmarks" concept (Live Nation, Coachella, Spotify as non-prospect anchor points within a cultural territory) is **not being built.** Reasoning, confirmed this session: too many companies work with a given landmark (e.g., Live Nation) for the relationship to be meaningful without knowing whether it's exclusive — and exclusivity isn't something that can be systematically sourced. Noisy, hard to keep current, low signal value relative to effort. Dropped from scope entirely.
+
+### II.10 Open / pending decisions (Part II)
+1. **Business verticals list** — the existing 6 (Food & Beverage, Automotive & Transportation, Technology & B2B, CPGs, Sports, Hospitality/Travel/Tourism) need to be revisited now that they're weighted-score wells rather than exclusive single-assignment categories, not simply carried over as-is. **Still open.**
+2. **Cultural verticals list — resolved, starting set (subject to revision):** Music (Performance), Sports, Gaming, Comedy, Festival, Talent & Celebrity Partnerships, Film & Television Inclusion, College Marketing, Outdoor & Adventure, Inter-Brand Collaborations (unexpected brand mashups — e.g., Crocs × KFC), Creator & Influencer Partnerships, Wellness & Fitness. **11 wells total.** Explicitly expected to evolve — not a final taxonomy. Music's flagship-tactic status (should it get dedicated treatment ahead of the others, e.g. an "inbound to Music" view) remains an open follow-on question.
+3. ~~Sister-agency ring color conflict~~ — **Resolved:** `#B83A1A` (G7 red), see II.3 and Part I 5a.1.
+4. **Floor-state node glow treatment** — unresolved, flagged in II.3.
+5. **Drop-shadow reconciliation** — unresolved, flagged in II.3.
+6. **Propagation schema re-expression** (6a.3's multipliers, now in gray-glow-opacity terms rather than purple fill) — unresolved, flagged in II.3.
+7. **Elastic-tether temporary dragging** — worth building, or is pan/zoom alone sufficient? Not committed either way (II.5).
+8. **G7 Gravity formula weights** — first draft only, explicitly slated for future revisit (II.7).
+9. **Arrow decay level shape** (linear vs. front/back-loaded) and **signal-type-dependent decay rates** — not yet decided (II.6).
+
+### II.12 Build approach — v2 branch/rebuild (resolved this session)
+Given the number of directly-superseded Part I build items (4b, 4c, 4f, 5a, 6a.1, 6a.1a, 6a.1b — see individual ⚠ flags), **this will be built as a v2 branch/rebuild** rather than incrementally patching the live build Claude Code has been iterating on. Branch name: **`cluster study v2`**. Rationale: several Part II mechanics (fixed positions replacing drag, weighted multi-vertical scoring replacing single-category assignment, concentric-centroid family rendering replacing fixed-radius orbits) are foundational enough that half-migrating them mid-session risks a broken intermediate state, especially with a Round 3 instruction set (selection-highlight-connectors, orbit-locked dragging, ring simplification, Generate Competitors) already in flight or recently completed on the current branch. The current build (`cluster-study` branch) remains the stable, demo-ready version (already shown to Julie) while `cluster study v2` is developed separately.
+
+### II.11 Signal Sweep pipeline requirements (for the Signal Stacks thread)
+Every signal Signal Stacks surfaces needs a new LLM classification pass, in addition to its existing lookalike relevance scoring, producing:
+- **Cultural territory tags with confidence** — which cultural wells (once II.10's list is defined) this signal is evidence for, and how strongly.
+- **Signal type** — identity-reinforcing (part of an established, repeated pattern) vs. momentum/one-off (a single new data point) — this is what determines whether something becomes a fading arrow (II.6) or actually nudges the underlying identity score.
+- **Business vertical relevance**, where applicable (e.g., a product-line expansion) — kept separate from cultural tagging per II.1's explicit split, not blended into one score.
+- **Arrow decay tier assignment** — which of the 6 monthly levels (II.6) a new signal starts at, and whether it reinforces an existing arrow or starts a fresh one.
+
+**Not required (per II.9):** any landmark-detection extraction — that concept has been dropped, so no pipeline work is needed for it.
+
+This is a genuinely new extraction category for Signal Stacks' existing Haiku pipeline, parallel to the already-flagged ownership-change extraction (Part I, 6a.5 / Flag 7) — worth scoping together as related pipeline additions rather than as isolated one-offs.
 
 ## 7. Data dependencies (the real blocker)
 
@@ -300,6 +423,8 @@ Cluster's real constraint is dependency order, not a calendar date:
 
 **Bootstrap rationale:** since Signal Stacks will take time to build up steam, Cluster's node population doesn't need to wait for it — the manual case-study/AI-assisted lane (one of the three original data-entry paths) can run independently now. These become permanent floor-state nodes (Section 5) with no ring or relevance decay; Signal Stacks later lights up rings/fill on top of the same brands as live signals arrive, rather than creating the nodes from scratch.
 
+**Map Engine v2 (Part II) status:** this is a foundational architecture change, not an incremental addition to the Gate structure above — several completed or in-progress Round 2/3 build items are directly superseded (flagged individually at each affected subsection). Not yet costed in hours, since core open questions (the cultural vertical taxonomy, several color/rendering reconciliations) are still unresolved per Part II, II.10. Recommend treating this as its own phase, sequenced after the open questions in II.10 are resolved, rather than folding it into the existing Gate 4 estimate until scope is firmer.
+
 ---
 
 ## 12. Flags for the Signal Stacks thread
@@ -313,6 +438,7 @@ These items surfaced in Cluster planning but are implementation work that belong
 5. **Talent Booking schema needs two additions once the rubric is built** (Section 10): a structured `talent_name` field, and a way to distinguish **booking type** — one-off engagement vs. ongoing/exclusive partnership. Both are needed for Cluster's Talent-side refinements, but they're schema decisions that belong in the Talent Booking rubric design, not retrofitted after the fact.
 6. **Scout vocabulary enrichment (ancillary, low priority).** Once the `talent_name` field exists, a simple scheduled (cron-pull, not real-time) diff could feed newly-identified artist names from the Backbone Sheet into Scout's entity vocabulary. No urgency; worth doing once Scout and Signal Stacks are both stable, not before. Depends on knowing how Scout's vocabulary is currently stored — not yet confirmed.
 7. **New — ownership-change extraction.** Section 6a.5 proposes adding an ownership-change extraction category (acquirer, acquired entity, date) to the existing RSS/Haiku pipeline, with a human-approval gate before it mutates Cluster's parent/child graph. Worth scoping alongside the existing extraction categories rather than as a fully separate pipeline.
+8. **New — Map Engine v2 classification layer (Part II, Section II.11).** A larger pipeline addition than Flag 7: every signal needs cultural-territory tagging (once the cultural vertical list is defined, Part II II.10), a business-vs-momentum signal-type classification (feeds the 6-level, 4-week arrow decay schedule, II.6), and business-vertical relevance where applicable — kept strictly separate from cultural tagging. Worth scoping together with Flag 7's ownership-change extraction as related pipeline additions. **Explicitly not required:** any landmark-detection extraction — that concept was evaluated and dropped (Part II, II.9) as unverifiable and noisy at the systematic level this pipeline would need.
 
 ---
 

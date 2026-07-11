@@ -18,6 +18,7 @@
  */
 
 import { DEFAULT_CONFIG } from '../public/scoring.js';
+import { stubVerticalScores } from '../public/verticals.js';
 
 export function slugify(name) {
   return String(name)
@@ -67,6 +68,10 @@ export function buildGraphFromSeed(seed) {
   };
 
   for (const hub of seed.hub_nodes || []) {
+    // II.1: two scored profiles per hub. Seed-supplied fields win; until the
+    // real scoring pass exists, the stub (old single vertical at 5 + rough
+    // derived secondaries) fills in — see verticals.js STUB_SCORES.
+    const stub = stubVerticalScores(hub);
     upsert({
       id: hub.id,
       name: hub.name,
@@ -74,6 +79,9 @@ export function buildGraphFromSeed(seed) {
       category: hub.category || null,
       zone: hub.zone || null,
       parent: null,
+      vertical: hub.vertical || null, // legacy single-assignment field, kept for reference
+      business_verticals: hub.business_verticals || stub.business_verticals,
+      cultural_verticals: hub.cultural_verticals || stub.cultural_verticals,
       is_g7_client: !!hub.is_g7_client,
       sister_agency: hub.sister_agency === true,
       confidence: hub.confidence || null,
