@@ -6,6 +6,7 @@ import {
   computeEffectiveRelevance,
   familySteps,
   ringsFor,
+  isNewAddition,
   DEFAULT_CONFIG,
 } from '../public/scoring.js';
 
@@ -67,6 +68,13 @@ describe('buildGraphFromSeed', () => {
     // Note: the seed marks 14 hubs true (incl. Olé); the plan §5a list has 13
     // (Olé absent) — the build trusts the JSON. Flagged for reconciliation.
     expect(graph.nodes.filter((n) => n.is_g7_client).length).toBeGreaterThanOrEqual(13);
+  });
+
+  it('carries the §5a.1 sister-agency flag (Subaru + Lagunitas only)', () => {
+    expect(graph.nodes.filter((n) => n.sister_agency).map((n) => n.id).sort()).toEqual([
+      'lagunitas',
+      'subaru',
+    ]);
   });
 
   it('carries COI flags onto links and nodes', () => {
@@ -192,23 +200,29 @@ describe('familySteps', () => {
   });
 });
 
-describe('rings (open questions #9/#11)', () => {
-  it('assigns signal/rfp rings by signal type', () => {
-    expect(ringsFor({ signal: { strength: 1, date: daysAgo(1), type: 'signal_stacks' } }, NOW)).toEqual(['signal']);
-    expect(ringsFor({ signal: { strength: 1, date: daysAgo(1), type: 'rfp' } }, NOW)).toEqual(['rfp']);
+describe('rings (simplified two-ring model, §9 revision + §5a.1)', () => {
+  it('gives ANY direct signal the unified teal Signal ring — RFP events included', () => {
+    expect(ringsFor({ signal: { strength: 1, date: daysAgo(1), type: 'signal_stacks' } })).toEqual(['signal']);
+    expect(ringsFor({ signal: { strength: 1, date: daysAgo(1), type: 'rfp' } })).toEqual(['signal']);
   });
 
-  it('stacks the new-addition ring additively for one week, then drops it', () => {
-    const node = {
-      signal: { strength: 1, date: daysAgo(1), type: 'rfp' },
-      date_added: daysAgo(3),
-    };
-    expect(ringsFor(node, NOW)).toEqual(['rfp', 'new']);
-    expect(ringsFor({ ...node, date_added: daysAgo(10) }, NOW)).toEqual(['rfp']);
+  it('gives sister-agency clients the yellow ring, stacking with signal', () => {
+    expect(ringsFor({ signal: null, sister_agency: true })).toEqual(['sister']);
+    expect(ringsFor({ signal: { strength: 1, date: daysAgo(1), type: 'rfp' }, sister_agency: true })).toEqual([
+      'signal',
+      'sister',
+    ]);
   });
 
-  it('gives floor-state nodes no rings', () => {
-    expect(ringsFor({ signal: null }, NOW)).toEqual([]);
+  it('gives floor-state nodes no rings, and never a new-addition ring', () => {
+    expect(ringsFor({ signal: null })).toEqual([]);
+    expect(ringsFor({ signal: null, date_added: daysAgo(1) })).toEqual([]);
+  });
+
+  it('isNewAddition marks the first week only (pulsing glow, not a ring)', () => {
+    expect(isNewAddition({ date_added: daysAgo(3) }, NOW)).toBe(true);
+    expect(isNewAddition({ date_added: daysAgo(10) }, NOW)).toBe(false);
+    expect(isNewAddition({}, NOW)).toBe(false);
   });
 });
 

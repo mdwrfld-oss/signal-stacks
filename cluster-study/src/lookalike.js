@@ -12,7 +12,9 @@
  * (Section 6.2) — the prompt carries worked examples as few-shot anchors.
  */
 
-import { slugify } from './graph.js';
+import seedData from '../G7_Cluster_Study_Seed_Data.json';
+import { slugify, buildGraphFromSeed, mergeOverlay } from './graph.js';
+import { GRAPH_KEY } from './sheets.js';
 
 export const PENDING_PREFIX = 'rfp:pending:';
 export const OVERLAY_KEY = 'graph:overlay';
@@ -91,10 +93,14 @@ function extractJson(content) {
   return JSON.parse(cleaned.slice(start, end + 1));
 }
 
-/** Steps 2–5: one agentic request with server-side web search. */
-export async function runLookalikeSearch(input, env) {
+/**
+ * One agentic Claude request with server-side web search, returning parsed
+ * strict-JSON output. Shared by the RFP lookalike pipeline (§6.1) and the
+ * on-demand Generate Competitors feature (§6c) — the same Worker-proxy
+ * pattern as Scout: the API key never leaves the server.
+ */
+async function callClaudeWithSearch(prompt, env, { maxTokens = 16000, maxUses = 12 } = {}) {
   if (!env.ANTHROPIC_API_KEY) throw new Error('Missing ANTHROPIC_API_KEY');
-  const prompt = buildPrompt(input);
   let messages = [{ role: 'user', content: prompt }];
   let response;
 
@@ -108,9 +114,9 @@ export async function runLookalikeSearch(input, env) {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 16000,
+        max_tokens: maxTokens,
         thinking: { type: 'adaptive' },
-        tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 12 }],
+        tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: maxUses }],
         messages,
       }),
     });
@@ -129,8 +135,12 @@ export async function runLookalikeSearch(input, env) {
   if (response.stop_reason === 'refusal') {
     throw new Error('Model declined the request (refusal stop reason)');
   }
+  return extractJson(response.content);
+}
 
-  const parsed = extractJson(response.content);
+/** Steps 2–5: one agentic request with server-side web search. */
+export async function runLookalikeSearch(input, env) {
+  const parsed = await callClaudeWithSearch(buildPrompt(input), env);
   if (!parsed.profile || !Array.isArray(parsed.candidates)) {
     throw new Error('Response missing expected profile/candidates structure');
   }
@@ -170,6 +180,124 @@ export async function listPendingBatches(env) {
   return batches.filter(Boolean).sort((a, b) => (a.created < b.created ? 1 : -1));
 }
 
+const normalizeName = (s) =>
+  String(s)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+/**
+ * §6c on-demand "Generate Competitors": for a Signal-ringed node, find 3–5
+ * real competitors via web search and extend the map outward from the live
+ * signal. Every candidate is checked against the EXISTING node set first —
+ * an existing brand gets connected, never duplicated. Genuinely new brands
+ * become floor-gray adjacent nodes (no signal of their own) in the overlay.
+ */
+export async function generateCompetitors(nodeId, env) {
+  // Current served graph = base (KV or seed) + overlay, same as /data.
+  let graph = JSON.parse((await env.CLUSTER_KV.get(GRAPH_KEY)) || 'null');
+  if (!graph) graph = buildGraphFromSeed(seedData);
+  const overlay = JSON.parse(
+    (await env.CLUSTER_KV.get(OVERLAY_KEY)) || '{"nodes":[],"links":[]}'
+  );
+  const merged = mergeOverlay(graph, JSON.parse(JSON.stringify(overlay)));
+
+  const source = merged.nodes.find((n) => n.id === nodeId);
+  if (!source) throw new Error(`Unknown node: ${nodeId}`);
+  if (!source.signal) {
+    // §6c: extends the map outward from real, current signals only.
+    throw new Error(`${source.name} has no active Signal ring`);
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+  const prompt = `You are a brand-intelligence researcher for G7 Entertainment Marketing (experiential + talent marketing agency).
+
+Use web search to find 3-5 REAL, CURRENTLY ACTIVE competitors of ${source.name}${source.category ? ` (category: ${source.category})` : ''}. Verify each brand is real and active as of ${today} — no defunct brands, no speculation.
+
+Relationship calibration:
+- direct_competitor: same category and medium, competing for the same buyers
+- analogous_audience: different category/medium but the same audience profile
+
+OUTPUT: STRICT JSON only, no markdown fences, exactly:
+{
+  "competitors": [
+    { "brand": "string", "relationship": "direct_competitor" | "analogous_audience", "note": "one line on why it competes", "confidence": "high" | "medium" | "low" }
+  ]
+}
+
+RULES: 3-5 entries, most relevant first, no duplicates, never include ${source.name} itself.`;
+
+  const parsed = await callClaudeWithSearch(prompt, env, { maxTokens: 8000, maxUses: 8 });
+  const candidates = (parsed.competitors || []).filter(
+    (c) => c && c.brand && ['direct_competitor', 'analogous_audience'].includes(c.relationship)
+  );
+  if (!candidates.length) throw new Error('Search returned no usable competitors');
+
+  const byNorm = new Map(merged.nodes.map((n) => [normalizeName(n.name), n]));
+  const linkExists = (a, b) =>
+    merged.links.some((l) => {
+      const s = typeof l.source === 'object' ? l.source.id : l.source;
+      const t = typeof l.target === 'object' ? l.target.id : l.target;
+      return (s === a && t === b) || (s === b && t === a);
+    });
+
+  const added = [];
+  const connected = [];
+  for (const c of candidates.slice(0, 5)) {
+    const existing = byNorm.get(normalizeName(c.brand));
+    if (existing) {
+      // Already on the map (§6c dedupe rule): connect, don't duplicate.
+      if (existing.id !== nodeId && !linkExists(nodeId, existing.id)) {
+        overlay.links.push({
+          source: nodeId,
+          target: existing.id,
+          relationship: c.relationship,
+          note: c.note || '',
+          coi_sensitive: false,
+        });
+        connected.push(existing.name);
+      }
+      continue;
+    }
+    const id = slugify(c.brand);
+    const node = {
+      id,
+      name: c.brand,
+      type: 'adjacent',
+      category: null,
+      zone: null,
+      parent: null,
+      sector: source.sector || null,
+      is_g7_client: false,
+      sister_agency: false,
+      confidence: c.confidence || null,
+      g7_notes: {
+        relationship_notes: `Generated competitor of ${source.name} (§6c on-demand search). ${c.note || ''}`,
+      },
+      coi_sensitive: false,
+      signal: null, // floor-gray until it earns a signal of its own (§6c)
+      date_added: today,
+      source: 'generated',
+    };
+    overlay.nodes.push(node);
+    overlay.links.push({
+      source: nodeId,
+      target: id,
+      relationship: c.relationship,
+      note: c.note || '',
+      coi_sensitive: false,
+    });
+    byNorm.set(normalizeName(c.brand), node);
+    added.push(c.brand);
+  }
+
+  await env.CLUSTER_KV.put(OVERLAY_KEY, JSON.stringify(overlay));
+  return { node: source.name, added, connected };
+}
+
 /**
  * Step 6 — human review. decisions: [{ brand, approve: bool }].
  * Approved candidates become floor-state overlay nodes linked to the RFP
@@ -203,6 +331,7 @@ export async function reviewBatch({ id, decisions }, env) {
         zone: null,
         parent: null,
         is_g7_client: false,
+        sister_agency: false,
         confidence: candidate.confidence || null,
         g7_notes: {
           relationship_notes: `RFP lookalike (${batch.client_name || 'unknown client'}, ${batch.outcome}). ${candidate.rationale || ''}`,

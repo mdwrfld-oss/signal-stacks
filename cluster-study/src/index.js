@@ -14,6 +14,7 @@ import {
   createPendingBatch,
   listPendingBatches,
   reviewBatch,
+  generateCompetitors,
   OVERLAY_KEY,
 } from './lookalike.js';
 
@@ -101,6 +102,24 @@ export default {
         return json({ status: 'pending_review', batch });
       } catch (err) {
         console.error(`[Cluster] Lookalike pipeline failed: ${err.message}`);
+        return json({ status: 'error', message: err.message }, 500);
+      }
+    }
+
+    if (url.pathname === '/api/competitors/generate' && request.method === 'POST') {
+      if (!authorized(request, env)) return new Response('Unauthorized', { status: 401 });
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return json({ error: 'Invalid JSON body' }, 400);
+      }
+      if (!body.node_id) return json({ error: 'node_id is required' }, 400);
+      try {
+        const result = await generateCompetitors(body.node_id, env);
+        return json({ status: 'ok', ...result });
+      } catch (err) {
+        console.error(`[Cluster] Generate Competitors failed: ${err.message}`);
         return json({ status: 'error', message: err.message }, 500);
       }
     }

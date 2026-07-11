@@ -3,9 +3,8 @@
   --g7-purple: #3a1d6e;
   --g7-purple-light: #e8e0f7;
   --floor-gray: #3d3a4c;
-  --ring-signal: #2fd4b8;
-  --ring-rfp: #ff9440;
-  --ring-new: #ff5252;
+  --ring-signal: #2fd4b8; /* unified: Signal Stacks detection OR RFP event */
+  --ring-sister: #f2d24b; /* §5a.1 Project Worldwide sister agency */
   --hull: #8b7dd8;
   --analog-gold: #e8c15a;
   --bg: #0d0b1a;
@@ -135,8 +134,21 @@ body { display: flex; flex-direction: column; }
 
 .ring { fill: none; stroke-width: 2.5px; }
 .ring.signal { stroke: var(--ring-signal); }
-.ring.rfp { stroke: var(--ring-rfp); }
-.ring.new { stroke: var(--ring-new); }
+.ring.sister { stroke: var(--ring-sister); }
+
+/* §9/§11: new additions pulse brighter for their first week — replaces the
+   old red new-addition ring entirely. */
+@keyframes new-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 5px rgba(214, 191, 255, 0.75))
+      drop-shadow(0 0 12px rgba(150, 110, 230, 0.45));
+  }
+  50% {
+    filter: drop-shadow(0 0 9px rgba(230, 214, 255, 1))
+      drop-shadow(0 0 24px rgba(168, 134, 255, 0.85));
+  }
+}
+.node circle.core.new-pulse { animation: new-pulse 2.6s ease-in-out infinite; }
 
 /* Zoom-conditional ring labels: only past the zoom threshold (Section 9 note). */
 .ring-label {
@@ -147,8 +159,7 @@ body { display: flex; flex-direction: column; }
 }
 .zoomed-in .ring-label { display: block; }
 .ring-label.signal { fill: var(--ring-signal); }
-.ring-label.rfp { fill: var(--ring-rfp); }
-.ring-label.new { fill: var(--ring-new); }
+.ring-label.sister { fill: var(--ring-sister); }
 
 /* §5d typography hierarchy: G7's own roster (hubs/parents) reads prominent;
    competitor/adjacent entities are permanently subordinate — reinforcing the
@@ -169,6 +180,16 @@ body { display: flex; flex-direction: column; }
 
 /* Lens dimming: switched-off, not removed (Section 4). */
 .dimmed { opacity: 0.1; filter: grayscale(0.85); transition: opacity 0.25s; }
+
+/* §4h selection: connected edges glow, everything else recedes slightly.
+   Filter dimming (.dimmed, §4g) stays stronger and is excluded here. */
+.has-selection .link:not(.connected):not(.dimmed) { opacity: 0.12; }
+.has-selection .node:not(.selected):not(.neighbor):not(.analog-partner):not(.dimmed) { opacity: 0.3; }
+.link.connected {
+  stroke: #b9a7f0;
+  stroke-width: 2px;
+  opacity: 1;
+}
 
 /* ---- panel ---- */
 
@@ -221,7 +242,27 @@ body { display: flex; flex-direction: column; }
 .badge.signal { background: #123c34; color: #4ee0c2; }
 .badge.rfp { background: #45280f; color: #ffb26e; }
 .badge.coi { background: #451518; color: #ff9d9d; }
+.badge.sister { background: #4a3c10; color: #f2d24b; }
 .rel-note { color: var(--muted); font-size: 12px; }
+/* §6c Generate Competitors */
+#gen-competitors {
+  background: #6a48b8;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+}
+#gen-competitors:hover:not(:disabled) { background: #7d5ccc; }
+#gen-competitors:disabled { opacity: 0.5; cursor: default; }
+@keyframes searching-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+#gen-status.searching { animation: searching-pulse 1.1s ease-in-out infinite; }
+#gen-status.searching::after { content: '…'; }
+
 .relevance-bar {
   height: 8px;
   border-radius: 4px;
@@ -252,8 +293,11 @@ body { display: flex; flex-direction: column; }
 .swatch.floor { background: var(--floor-gray); }
 .swatch.ring { background: #fff; border: 2.5px solid; }
 .swatch.ring-signal { border-color: var(--ring-signal); }
-.swatch.ring-rfp { border-color: var(--ring-rfp); }
-.swatch.ring-new { border-color: var(--ring-new); }
+.swatch.ring-sister { border-color: var(--ring-sister); }
+.swatch.pulse {
+  background: radial-gradient(circle, #e6d6ff 0%, #a886ff 45%, transparent 75%);
+  animation: new-pulse 2.6s ease-in-out infinite;
+}
 .swatch.orbit { background: rgba(106, 76, 147, 0.06); border: 1.5px dashed var(--hull); }
 
 #status {

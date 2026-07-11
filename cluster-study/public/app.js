@@ -21,6 +21,7 @@ import {
   DEFAULT_CONFIG,
   computeEffectiveRelevance,
   ringsFor,
+  isNewAddition,
 } from '/scoring.js';
 import {
   nearestFreeCell,
@@ -168,7 +169,8 @@ function prepare(graph) {
   });
   for (const n of graph.nodes) {
     n.r = RADII[n.type] || RADII.adjacent;
-    n.rings = ringsFor(n, now, state.config);
+    n.rings = ringsFor(n);
+    n.isNew = isNewAddition(n, now, state.config);
     const eff = state.effective.get(n.id);
     n.relevance = eff ? eff.relevance : 0;
     n.floor = !n.signal && !eff;
@@ -378,14 +380,26 @@ function render(graph) {
       fam.radius
     );
     for (const child of fam.children) {
-      if (Array.isArray(saved[child.id])) continue;
-      const slot = slots.get(child.id);
       child.orbital = true;
-      // Slots are FIXED (§6a.1): pin children like snapped nodes, so their
-      // own satellite links can't tug them off the orbit. Dragging still
-      // works — the drag handler overrides fx/fy for its duration.
-      child.homeX = child.x = child.fx = slot.x;
-      child.homeY = child.y = child.fy = slot.y;
+      let target = slots.get(child.id);
+      if (Array.isArray(saved[child.id])) {
+        // §6a.1b: a user-placed child persists its ANGLE around the parent;
+        // the radius always normalizes to the (possibly recomputed) orbit,
+        // so a saved child can never reload detached from its ring.
+        const a = Math.atan2(
+          saved[child.id][1] - fam.parent.homeY,
+          saved[child.id][0] - fam.parent.homeX
+        );
+        target = {
+          x: fam.parent.homeX + fam.radius * Math.cos(a),
+          y: fam.parent.homeY + fam.radius * Math.sin(a),
+        };
+      }
+      // Pin children on the ring (§6a.1): their own satellite links can't
+      // tug them off it. Dragging still works — the drag handler overrides
+      // fx/fy for its duration.
+      child.homeX = child.x = child.fx = target.x;
+      child.homeY = child.y = child.fy = target.y;
     }
   }
 
@@ -482,6 +496,9 @@ function render(graph) {
     // §5b: shadows lift parents + owned clients off the canvas; adjacent and
     // floor-state nodes stay flat, reinforcing the §5a purple/gray split.
     .classed('elevated', (d) => d.is_g7_client || d.type === 'parent')
+    // §9/§11 revision: new additions pulse brighter for their first week —
+    // this REPLACES the old red new-addition ring.
+    .classed('new-pulse', (d) => d.isNew)
     .attr('r', (d) => d.r)
     .attr('fill', (d) =>
       d.is_g7_client
@@ -502,7 +519,7 @@ function render(graph) {
         .attr('class', `ring-label ${ring}`)
         .attr('text-anchor', 'middle')
         .attr('y', -(rr + 1.5))
-        .text(ring === 'signal' ? 'SIGNAL' : ring === 'rfp' ? 'RFP' : 'NEW');
+        .text(ring === 'signal' ? 'SIGNAL' : 'SISTER');
     });
   });
 
@@ -651,13 +668,28 @@ function render(graph) {
   function selectNode(d) {
     state.selected = d;
     node.classed('selected', (n) => n.id === d.id);
+    // §4h: selection highlights ALL of the node's connectors — competitor,
+    // analogous-audience, parent/subsidiary — and its neighbors; everything
+    // else dims slightly. Structural-analog lines (6a.7) are the one case
+    // where the edge is CREATED on selection; grounded edges just get
+    // emphasized. Same rule, two renderings.
+    const neighbors = new Set();
+    for (const l of layoutLinks) {
+      if (l.source === d) neighbors.add(l.target);
+      if (l.target === d) neighbors.add(l.source);
+    }
+    viewport.classed('has-selection', true);
+    link.classed('connected', (l) => l.source === d || l.target === d);
+    node.classed('neighbor', (n) => neighbors.has(n));
     updateAnalogLines();
     showPanel(d);
   }
 
   function clearSelection() {
     state.selected = null;
-    node.classed('selected', false).classed('analog-partner', false);
+    viewport.classed('has-selection', false);
+    node.classed('selected', false).classed('analog-partner', false).classed('neighbor', false);
+    link.classed('connected', false);
     updateAnalogLines();
     panel.classList.add('hidden');
   }
@@ -822,52 +854,70 @@ function dragBehavior(simulation, nodes, families) {
     })
     .on('end', (event, d) => {
       if (!event.active) simulation.alphaTarget(0);
-      // Occupancy: every other node's home claims its containing cell, so two
-      // nodes can never land on the same spot (§4c fallback rule).
-      const occupied = new Set();
-      for (const n of nodes) {
-        if (n !== d) occupied.add(cellKey(...cellOf(n.homeX, n.homeY)));
-      }
-      const cell = nearestFreeCell(event.x, event.y, occupied);
-      const dx = cell.x - d.homeX;
-      const dy = cell.y - d.homeY;
-      d.homeX = cell.x;
-      d.homeY = cell.y;
-      saveNodePosition(d.id, cell.x, cell.y);
-      // Dragging a parent moves its orbit with it: children still in their
-      // slots (not individually placed by the user) keep formation. Their
-      // homes are derived from the parent's, so only the parent is saved.
-      if (d.type === 'parent') {
-        const fam = families.find((f) => f.parent === d);
-        const savedNow = loadSavedLayout();
-        for (const child of fam?.children || []) {
-          if (Array.isArray(savedNow[child.id])) continue;
-          child.homeX += dx;
-          child.homeY += dy;
-          // Glide the child's pin to its new slot alongside the parent's snap
-          // tween — the alpha-scaled anchor alone stalls out on long moves.
-          const from = { x: child.x, y: child.y };
-          const to = { x: child.homeX, y: child.homeY };
-          d3.select({}).transition().duration(300).ease(d3.easeCubicOut).tween('follow', () => (t) => {
-            child.x = child.fx = from.x + (to.x - from.x) * t;
-            child.y = child.fy = from.y + (to.y - from.y) * t;
-            child.vx = 0;
-            child.vy = 0;
-          });
+
+      // Placed nodes stay pinned — link tension must not drag them off their
+      // spot. Short tween so every release animates rather than teleporting.
+      const glidePin = (target) => {
+        const from = { x: event.x, y: event.y };
+        d3.select({}).transition().duration(220).ease(d3.easeCubicOut).tween('snap', () => (t) => {
+          d.fx = from.x + (target.x - from.x) * t;
+          d.fy = from.y + (target.y - from.y) * t;
+        });
+      };
+
+      const childFam = d.orbital ? families.find((f) => f.children.includes(d)) : null;
+      if (childFam) {
+        // §6a.1b orbit-locked release: a child dragged around (or away from)
+        // its parent projects onto the orbit circle at the DROP angle —
+        // radius normalized, NOT returned to its original slot. Lets users
+        // reorder a crowded ring (MABI) without a child ever drifting off it.
+        const p = childFam.parent;
+        const angle = Math.atan2(event.y - p.y, event.x - p.x);
+        const target = {
+          x: p.x + childFam.radius * Math.cos(angle),
+          y: p.y + childFam.radius * Math.sin(angle),
+        };
+        d.homeX = target.x;
+        d.homeY = target.y;
+        saveNodePosition(d.id, target.x, target.y); // reloaded as an angle (§6a.1b)
+        glidePin(target);
+      } else {
+        // §4c grid snap for parents and free nodes. Occupancy: every other
+        // node's home claims its containing cell, so two nodes can never
+        // land on the same spot.
+        const occupied = new Set();
+        for (const n of nodes) {
+          if (n !== d) occupied.add(cellKey(...cellOf(n.homeX, n.homeY)));
+        }
+        const cell = nearestFreeCell(event.x, event.y, occupied);
+        const dx = cell.x - d.homeX;
+        const dy = cell.y - d.homeY;
+        d.homeX = cell.x;
+        d.homeY = cell.y;
+        saveNodePosition(d.id, cell.x, cell.y);
+        glidePin(cell);
+        if (d.type === 'parent') {
+          // The whole orbit moves with its parent — INCLUDING user-placed
+          // children, since their ring is defined by the parent (§6a.1b).
+          const fam = families.find((f) => f.parent === d);
+          for (const child of fam?.children || []) {
+            child.homeX += dx;
+            child.homeY += dy;
+            const from = { x: child.x, y: child.y };
+            const to = { x: child.homeX, y: child.homeY };
+            d3.select({}).transition().duration(300).ease(d3.easeCubicOut).tween('follow', () => (t) => {
+              child.x = child.fx = from.x + (to.x - from.x) * t;
+              child.y = child.fy = from.y + (to.y - from.y) * t;
+              child.vx = 0;
+              child.vy = 0;
+            });
+          }
         }
       }
       // d3.forceX/Y cache their target accessor at initialization — homes
       // just changed, so re-point the anchors or they pull at stale spots.
       simulation.force('x').x((n) => n.homeX);
       simulation.force('y').y((n) => n.homeY);
-      // Placed nodes stay pinned to their cell (desktop-icon semantics) —
-      // link tension must not drag them off it. Short tween so the snap
-      // animates rather than teleporting.
-      const from = { x: event.x, y: event.y };
-      d3.select({}).transition().duration(220).ease(d3.easeCubicOut).tween('snap', () => (t) => {
-        d.fx = from.x + (cell.x - from.x) * t;
-        d.fy = from.y + (cell.y - from.y) * t;
-      });
       simulation.alpha(0.35).restart();
     });
 }
@@ -899,8 +949,14 @@ function showPanel(d) {
   const badges = [];
   if (d.is_g7_client) badges.push('<span class="badge client">G7 CLIENT</span>');
   if (d.zone) badges.push(`<span class="badge zone">${esc(d.zone.toUpperCase())}</span>`);
-  if (d.rings?.includes('signal')) badges.push('<span class="badge signal">SIGNAL STACKS</span>');
-  if (d.rings?.includes('rfp')) badges.push('<span class="badge rfp">RFP</span>');
+  if (d.signal) {
+    badges.push(
+      d.signal.type === 'rfp'
+        ? '<span class="badge rfp">RFP EVENT</span>'
+        : '<span class="badge signal">SIGNAL STACKS</span>'
+    );
+  }
+  if (d.sister_agency) badges.push('<span class="badge sister">SISTER AGENCY</span>');
   if (d.coi_sensitive) badges.push('<span class="badge coi">COI-SENSITIVE</span>');
   if (badges.length) parts.push(`<p>${badges.join(' ')}</p>`);
 
@@ -989,8 +1045,58 @@ function showPanel(d) {
     );
   }
 
+  /* §6c: extend the map outward from live signals — Signal-ringed nodes only */
+  if (d.signal) {
+    parts.push('<h3>Extend the map</h3>');
+    parts.push('<p><button id="gen-competitors">Generate Competitors</button></p>');
+    parts.push('<p class="rel-note" id="gen-status"></p>');
+  }
+
   panelContent.innerHTML = parts.join('');
   panel.classList.remove('hidden');
+  wireGenerateCompetitors(d);
+}
+
+/**
+ * §6c on-demand competitor search. The Claude call runs server-side in the
+ * Worker (same proxy pattern as Scout — the API key never reaches the
+ * browser); this just POSTs the node id and shows progress. New/connected
+ * competitors land in the served graph, so the map reloads to show them.
+ */
+function wireGenerateCompetitors(d) {
+  const btn = document.getElementById('gen-competitors');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    let secret = localStorage.getItem('cluster_secret');
+    if (!secret) {
+      secret = window.prompt('Trigger secret (stored in this browser for future searches):') || '';
+      if (!secret) return;
+      localStorage.setItem('cluster_secret', secret);
+    }
+    const status = document.getElementById('gen-status');
+    btn.disabled = true;
+    status.textContent = 'Searching';
+    status.classList.add('searching');
+    try {
+      const resp = await fetch('/api/competitors/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
+        body: JSON.stringify({ node_id: d.id }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(data.message || `HTTP ${resp.status}`);
+      status.classList.remove('searching');
+      const bits = [`${data.added.length} new`];
+      if (data.connected.length) bits.push(`${data.connected.length} connected to existing nodes`);
+      status.textContent = `Found ${bits.join(', ')} — refreshing map…`;
+      setTimeout(() => location.reload(), 1400);
+    } catch (err) {
+      status.classList.remove('searching');
+      status.textContent = `Error: ${err.message}`;
+      btn.disabled = false;
+      if (/HTTP 401/.test(err.message)) localStorage.removeItem('cluster_secret');
+    }
+  });
 }
 
 const linkIdOf = (v) => (typeof v === 'object' ? v.id : v);

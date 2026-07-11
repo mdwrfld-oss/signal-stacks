@@ -26,7 +26,12 @@
       "sports",
       "hospitality_travel_tourism"
     ],
-    "vertical_notes": "cpgs and sports currently have no hub nodes — both are real, defined sectors awaiting future roster additions, not errors."
+    "vertical_notes": "cpgs and sports currently have no hub nodes — both are real, defined sectors awaiting future roster additions, not errors.",
+    "ring_types": {
+      "signal": "teal — unified ring for Signal Stacks detection and RFP-sourced events",
+      "sister_agency": "yellow — Project Worldwide sister-agency relationship"
+    },
+    "new_addition_treatment": "pulsing glow (brighter + slow pulse) for first week, not a separate ring type"
   },
   "hub_nodes": [
     {
@@ -77,7 +82,8 @@
         "relationship_notes": "Part of the Mark Anthony Brands relationship — G7's warmest client relationship overall. Historically included talent booking; that has recently changed (Experiential only going forward)."
       },
       "is_g7_client": true,
-      "vertical": "food_beverage"
+      "vertical": "food_beverage",
+      "sister_agency": false
     },
     {
       "id": "liquid_death",
@@ -128,7 +134,8 @@
         }
       ],
       "is_g7_client": true,
-      "vertical": "food_beverage"
+      "vertical": "food_beverage",
+      "sister_agency": false
     },
     {
       "id": "fireball_whiskey",
@@ -169,7 +176,8 @@
         }
       ],
       "is_g7_client": true,
-      "vertical": "food_beverage"
+      "vertical": "food_beverage",
+      "sister_agency": false
     },
     {
       "id": "ram_trucks",
@@ -210,7 +218,8 @@
         }
       ],
       "is_g7_client": true,
-      "vertical": "automotive_transportation"
+      "vertical": "automotive_transportation",
+      "sister_agency": false
     },
     {
       "id": "turbotax_intuit",
@@ -250,7 +259,8 @@
         "relationship_notes": "Lapsed — last worked together roughly a year ago, not a current client. G7 has done both Experiential and Talent Booking work for them, at both the TurboTax and Intuit corporate level."
       },
       "is_g7_client": false,
-      "vertical": "technology_b2b"
+      "vertical": "technology_b2b",
+      "sister_agency": false
     },
     {
       "id": "atlassian",
@@ -291,7 +301,8 @@
         }
       ],
       "is_g7_client": true,
-      "vertical": "technology_b2b"
+      "vertical": "technology_b2b",
+      "sister_agency": false
     },
     {
       "id": "subaru",
@@ -336,7 +347,8 @@
         "relationship_notes": "Current client. G7 has pitched for additional Experiential business without success, and separately pitched Talent Booking business that also did not close (RFP: Lost, Talent lane) — worth surfacing as a lookalike-search trigger per Section 6."
       },
       "is_g7_client": true,
-      "vertical": "automotive_transportation"
+      "vertical": "automotive_transportation",
+      "sister_agency": true
     },
     {
       "id": "lagunitas",
@@ -376,7 +388,8 @@
         "relationship_notes": "A few programs per year. Client-side organization makes long-term planning difficult."
       },
       "is_g7_client": true,
-      "vertical": "food_beverage"
+      "vertical": "food_beverage",
+      "sister_agency": true
     },
     {
       "id": "jackson_hole",
@@ -421,7 +434,8 @@
         "relationship_notes": "Yearly client; work is expected to continue."
       },
       "is_g7_client": true,
-      "vertical": "hospitality_travel_tourism"
+      "vertical": "hospitality_travel_tourism",
+      "sister_agency": false
     },
     {
       "id": "workday",
@@ -457,7 +471,8 @@
         }
       ],
       "is_g7_client": true,
-      "vertical": "technology_b2b"
+      "vertical": "technology_b2b",
+      "sister_agency": false
     },
     {
       "id": "cisco",
@@ -493,7 +508,8 @@
         }
       ],
       "is_g7_client": true,
-      "vertical": "technology_b2b"
+      "vertical": "technology_b2b",
+      "sister_agency": false
     },
     {
       "id": "mikes_hard_lemonade",
@@ -521,7 +537,8 @@
         }
       ],
       "is_g7_client": true,
-      "vertical": "food_beverage"
+      "vertical": "food_beverage",
+      "sister_agency": false
     },
     {
       "id": "cayman_jack",
@@ -570,7 +587,8 @@
         }
       ],
       "is_g7_client": true,
-      "vertical": "food_beverage"
+      "vertical": "food_beverage",
+      "sister_agency": false
     },
     {
       "id": "ole",
@@ -605,7 +623,8 @@
         }
       ],
       "is_g7_client": true,
-      "vertical": "food_beverage"
+      "vertical": "food_beverage",
+      "sister_agency": false
     },
     {
       "id": "mojo_energy",
@@ -650,7 +669,8 @@
         }
       ],
       "is_g7_client": true,
-      "vertical": "food_beverage"
+      "vertical": "food_beverage",
+      "sister_agency": false
     }
   ],
   "corporate_parents": [

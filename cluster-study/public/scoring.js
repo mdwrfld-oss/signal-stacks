@@ -114,16 +114,28 @@ export function isFloorState(node, effective) {
   return !node.signal && !effective.has(node.id);
 }
 
-/** Ring types for a node (open question #9/#11): direct signals only for now (open question #13 stays open — inherited signals get fill, not rings). */
-export function ringsFor(node, nowMs, config = DEFAULT_CONFIG) {
+/**
+ * Ring types — simplified two-ring model (Section 9 revision):
+ * - 'signal' (teal): ANY active direct signal — Signal Stacks detection or
+ *   RFP-sourced event. RFP events no longer get their own ring color; they
+ *   still darken fill and activate this ring.
+ * - 'sister' (yellow): confirmed Project Worldwide sister-agency client
+ *   (§5a.1 — Subaru and Lagunitas are the first real examples).
+ * New additions no longer get a ring at all — see isNewAddition below
+ * (brighter pulsing glow for the first week instead, §9/§11).
+ * Direct signals only, per open question #13 — inherited signals get fill,
+ * not rings.
+ */
+export function ringsFor(node) {
   const rings = [];
-  if (node.signal && node.signal.type === 'signal_stacks') rings.push('signal');
-  if (node.signal && node.signal.type === 'rfp') rings.push('rfp');
-  if (node.date_added) {
-    const addedMs = Date.parse(node.date_added);
-    if (!Number.isNaN(addedMs) && (nowMs - addedMs) / MS_PER_DAY <= config.new_addition_days) {
-      rings.push('new');
-    }
-  }
+  if (node.signal) rings.push('signal');
+  if (node.sister_agency) rings.push('sister');
   return rings;
+}
+
+/** New addition within its first week (§9/§11) — rendered as a pulsing glow. */
+export function isNewAddition(node, nowMs, config = DEFAULT_CONFIG) {
+  if (!node.date_added) return false;
+  const addedMs = Date.parse(node.date_added);
+  return !Number.isNaN(addedMs) && (nowMs - addedMs) / MS_PER_DAY <= config.new_addition_days;
 }

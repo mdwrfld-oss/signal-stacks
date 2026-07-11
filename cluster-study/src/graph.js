@@ -75,6 +75,7 @@ export function buildGraphFromSeed(seed) {
       zone: hub.zone || null,
       parent: null,
       is_g7_client: !!hub.is_g7_client,
+      sister_agency: hub.sister_agency === true,
       confidence: hub.confidence || null,
       g7_notes: hub.g7_notes || null,
       coi_sensitive: false,
@@ -93,6 +94,7 @@ export function buildGraphFromSeed(seed) {
         zone: null,
         parent: null,
         is_g7_client: false,
+        sister_agency: false,
         confidence: null,
         g7_notes: null,
         coi_sensitive: !!adj.coi_sensitive,
@@ -122,6 +124,7 @@ export function buildGraphFromSeed(seed) {
       // §5a: corporate parents that aren't themselves direct clients stay
       // floor-gray; the seed only sets is_g7_client on hub nodes.
       is_g7_client: !!parent.is_g7_client,
+      sister_agency: parent.sister_agency === true,
       confidence: parent.confidence || null,
       g7_notes: parent.note ? { relationship_notes: parent.note } : null,
       coi_sensitive: false,
@@ -196,6 +199,7 @@ export function buildGraphFromSheet(nodeRows, relRows) {
       parent: (row.parent || '').trim() || null,
       sector: (row.sector || '').trim().toLowerCase() || null,
       is_g7_client: parseBool(row.is_g7_client),
+      sister_agency: parseBool(row.sister_agency),
       confidence: (row.confidence || '').trim() || null,
       g7_notes: (row.notes || '').trim() ? { relationship_notes: row.notes.trim() } : null,
       coi_sensitive: parseBool(row.coi_sensitive),
