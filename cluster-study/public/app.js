@@ -23,14 +23,15 @@ import {
   ringsFor,
   isNewAddition,
 } from '/scoring.js';
+import { nearestFreeCell, cellOf, cellKey } from '/layout.js';
 import {
-  nearestFreeCell,
-  cellOf,
-  cellKey,
-  orbitRadius,
-  orbitalSlots,
-  radialEscape,
-} from '/layout.js';
+  BUSINESS_VERTICALS,
+  CULTURAL_VERTICALS,
+  normalizeScores,
+  weightedPosition,
+  centroid,
+  LEGACY_SECTOR_TO_BUSINESS,
+} from '/verticals.js';
 
 const svg = d3.select('#canvas');
 const statusEl = document.getElementById('status');
@@ -47,54 +48,21 @@ const ADJ_LABEL_ZOOM = 0.85;
 const RADII = { hub: 16, parent: 24, adjacent: 8 };
 const RING_GAP = 4;
 
-/* §4f vertical sectors: six regions on a 3×2 star-chart grid. */
-const SECTORS = [
-  { id: 'food_beverage', label: 'FOOD & BEVERAGE', col: 0, row: 0 },
-  { id: 'automotive', label: 'AUTOMOTIVE & TRANSPORTATION', col: 1, row: 0 },
-  { id: 'tech_b2b', label: 'TECHNOLOGY & B2B', col: 2, row: 0 },
-  { id: 'cpg', label: 'CPGs', col: 0, row: 1 },
-  { id: 'sports', label: 'SPORTS', col: 1, row: 1 },
-  { id: 'hospitality', label: 'HOSPITALITY / TRAVEL / TOURISM', col: 2, row: 1 },
-];
-// Cell size has to hold the largest sector (Food & Beverage: ~10 clusters
-// including the MABI orbit) at current repulsion levels.
-const SECTOR_W = 950;
-const SECTOR_H = 800;
-
-/**
- * Sector membership: hubs and parents classify explicitly; adjacent nodes
- * inherit their connected hubs' sector — EXCEPT the outdoor-lifestyle
- * override, which is what makes Subaru → REI/Yeti/Patagonia read as
- * cross-sector "trade routes" (§4f). A `sector` field carried in the graph
- * data (Sheet column / CSV ingestion) always wins over this map.
+/*
+ * Map Engine v2 (Plan Part II): position is SEMANTIC. Each map's vertical
+ * wells are fixed, INVISIBLE anchor points (attractors, not labeled regions —
+ * II.2); a scored entity sits at the weighted average of the anchors its
+ * scores pull it toward. Two independently-computed coordinates per node —
+ * Business Landscape and Cultural Landscape — with a toggle that flies every
+ * node between them. This replaces Part I §4f's sector grid/force entirely.
  */
-const SECTOR_BY_NODE = {
-  white_claw: 'food_beverage',
-  mikes_hard_lemonade: 'food_beverage',
-  cayman_jack: 'food_beverage',
-  ole: 'food_beverage',
-  fireball_whiskey: 'food_beverage',
-  liquid_death: 'food_beverage',
-  lagunitas: 'food_beverage',
-  mojo_energy: 'food_beverage',
-  mark_anthony_brands: 'food_beverage',
-  swisher: 'food_beverage',
-  ram_trucks: 'automotive',
-  subaru: 'automotive',
-  turbotax_intuit: 'tech_b2b',
-  atlassian: 'tech_b2b',
-  workday: 'tech_b2b',
-  cisco: 'tech_b2b',
-  intuit: 'tech_b2b',
-  jackson_hole: 'hospitality',
-  // Outdoor-lifestyle brands are CPGs (non-food packaged goods), not their
-  // hubs' verticals.
-  yeti: 'cpg',
-  carhartt: 'cpg',
-  rei: 'cpg',
-  patagonia: 'cpg',
-  the_north_face: 'cpg',
-};
+const MAP_TRANSITION_MS = 1100;
+// Business wells: 3×2 grid of anchor points (6 verticals).
+const BIZ_COL_STEP = 720;
+const BIZ_ROW_STEP = 660;
+// Cultural wells: 12 anchor points on an ellipse.
+const CULT_RX = 900;
+const CULT_RY = 640;
 
 const state = {
   graph: null,
@@ -102,6 +70,7 @@ const state = {
   lens: 'all',
   signalsOnly: false, // §4g
   dimCompetitors: false, // §4g
+  map: 'business', // II.2: active landscape
   selected: null,
   k: 1,
   effective: new Map(),
@@ -203,22 +172,19 @@ function prepare(graph) {
     }
   }
 
-  // §4f sector assignment: data field wins, then the explicit map, then
-  // majority inheritance from connected hubs (two passes so hubs resolve
-  // before their satellites inherit).
+  // II.1 normalized weights per map. Scored hubs use their two profiles;
+  // v1 CSV/generated nodes carry only a legacy `sector` — mapped to a
+  // single business-vertical weight so they place on the Business map
+  // (no cultural data → they don't fly on toggle, see render()).
   for (const n of graph.nodes) {
-    if (!n.sector) n.sector = SECTOR_BY_NODE[n.id] || null;
-  }
-  for (const n of graph.nodes) {
-    if (n.sector) continue;
-    const counts = new Map();
-    for (const hubId of state.neighborHubs.get(n.id) || []) {
-      const s = state.nodesById.get(hubId)?.sector;
-      if (s) counts.set(s, (counts.get(s) || 0) + 1);
+    let business = normalizeScores(n.business_verticals, BUSINESS_VERTICALS);
+    if (!business && n.sector && LEGACY_SECTOR_TO_BUSINESS[n.sector]) {
+      business = { [LEGACY_SECTOR_TO_BUSINESS[n.sector]]: 1 };
     }
-    for (const [s, c] of counts) {
-      if (!n.sector || c > counts.get(n.sector)) n.sector = s;
-    }
+    n.weights = {
+      business,
+      cultural: normalizeScores(n.cultural_verticals, CULTURAL_VERTICALS),
+    };
   }
 }
 
@@ -257,47 +223,33 @@ function render(graph) {
   svg.attr('viewBox', [0, 0, width, height]);
 
   const viewport = svg.append('g').attr('id', 'viewport').attr('class', 'zoomed-out');
-  const sectorLayer = viewport.append('g');
   const hullLayer = viewport.append('g');
   const linkLayer = viewport.append('g');
   const analogLayer = viewport.append('g');
   const nodeLayer = viewport.append('g');
 
-  // §4f sector geometry: a 3×2 grid centered on the canvas, in world coords
-  // (pans/zooms with the map). Sector force targets pull each node's settle
-  // position into its vertical's region; empty sectors still render.
-  const gridX0 = width / 2 - SECTOR_W * 1.5;
-  const gridY0 = height / 2 - SECTOR_H;
-  const sectorCenter = new Map(
-    SECTORS.map((s) => [
-      s.id,
-      { x: gridX0 + (s.col + 0.5) * SECTOR_W, y: gridY0 + (s.row + 0.5) * SECTOR_H },
+  /* II.2 invisible well anchors — attractors the position math pulls toward,
+     NOT rendered regions (well illumination is later-phase work, II.3). */
+  const cx = width / 2;
+  const cy = height / 2;
+  const businessAnchors = new Map(
+    BUSINESS_VERTICALS.map((v, i) => [
+      v.id,
+      { x: cx + ((i % 3) - 1) * BIZ_COL_STEP, y: cy + (Math.floor(i / 3) - 0.5) * BIZ_ROW_STEP },
     ])
   );
-  const sectorTarget = (d, axis) => {
-    const c = d.sector && sectorCenter.get(d.sector);
-    if (!c) return axis === 'x' ? width / 2 : height / 2;
-    return c[axis];
-  };
+  const culturalAnchors = new Map(
+    CULTURAL_VERTICALS.map((v, i) => {
+      const a = (i / CULTURAL_VERTICALS.length) * 2 * Math.PI - Math.PI / 2;
+      return [v.id, { x: cx + CULT_RX * Math.cos(a), y: cy + CULT_RY * Math.sin(a) }];
+    })
+  );
+  const anchorsFor = (mapId) => (mapId === 'business' ? businessAnchors : culturalAnchors);
 
   // Structural analogs stay OUT of the layout links: not physical proximity,
   // not a persistent line (Section 6a.7).
   const layoutLinks = graph.links.map((l) => ({ ...l }));
-
-  // §6a.1: families and orbit radii come first so the parent_of link force
-  // and the orbital slots agree on the same distance — otherwise the link
-  // force perpetually drags children off their slots.
   const families = buildFamilies(graph);
-  const orbitOf = new Map();
-  for (const fam of families) {
-    fam.radius = orbitRadius(
-      fam.children.length,
-      fam.parent.r,
-      d3.max(fam.children, (c) => 2 * c.boxHw),
-      2 * fam.parent.boxHw
-    );
-    for (const child of fam.children) orbitOf.set(child.id, fam.radius);
-  }
 
   const simulation = d3
     .forceSimulation(graph.nodes)
@@ -306,57 +258,138 @@ function render(graph) {
       d3
         .forceLink(layoutLinks)
         .id((d) => d.id)
-        .distance((d) =>
-          // §4e spacing: competitor/audience links lengthened for breathing
-          // room between clusters; parent_of stays locked to the orbit radius.
-          d.relationship === 'parent_of'
-            ? orbitOf.get(typeof d.target === 'object' ? d.target.id : d.target) || 90
-            : d.relationship === 'direct_competitor'
-              ? 90
-              : 130
-        )
+        // §4e spacing distances retained for satellite placement.
+        .distance((d) => (d.relationship === 'direct_competitor' ? 90 : 130))
         .strength((d) =>
-          // §4f: a link SPANNING sectors is a trade route, not a spring — it
-          // must not drag its endpoints out of their home sectors. Same-sector
-          // links keep their structural strengths.
-          d.source.sector && d.target.sector && d.source.sector !== d.target.sector
-            ? 0.02
-            : d.relationship === 'parent_of'
-              ? 0.9
-              : d.relationship === 'direct_competitor'
-                ? 0.5
-                : 0.3
+          // parent_of endpoints are both pinned semantically (positions /
+          // centroids) — zero the spring so it can't fight the pins.
+          d.relationship === 'parent_of' ? 0 : d.relationship === 'direct_competitor' ? 0.5 : 0.3
         )
     )
     .force(
       'charge',
-      // §4e spacing: stronger repulsion on cluster centers (hubs/parents) so
-      // distinct clusters settle with clear whitespace between them.
+      // §4e spacing: repulsion values carried over.
       d3.forceManyBody().strength((d) => (d.type === 'hub' ? -520 : d.type === 'parent' ? -450 : -140))
     )
     .force('collide', d3.forceCollide((d) => d.r + 8))
-    .force('orbitExclusion', forceOrbitExclusion(families))
     .force('labelCollide', forceLabelCollide())
-    // §4f: the settle-time positional pull IS the sector force — each node
-    // gravitates toward its vertical's region, layered under the link/orbit
-    // forces. After settle, per-node anchors take over as before.
-    .force('x', d3.forceX((d) => sectorTarget(d, 'x')).strength(0.14))
-    .force('y', d3.forceY((d) => sectorTarget(d, 'y')).strength(0.14))
+    // Weak containment only — placement comes from semantic pins (scored
+    // nodes) and links (satellites), not from any regional force (§4f gone).
+    .force('x', d3.forceX(cx).strength(0.03))
+    .force('y', d3.forceY(cy).strength(0.03))
     .stop();
 
-  // Deterministic settle: D3 seeds positions on a phyllotaxis spiral and the
-  // forces are noise-free, so the same data always lands in the same map —
-  // spatial memory across visits.
-  for (let i = 0; i < SETTLE_TICKS; i++) simulation.tick();
-
-  // Anchored default positions: store home, swap centering for anchor forces.
-  for (const n of graph.nodes) {
-    n.homeX = n.x;
-    n.homeY = n.y;
+  /**
+   * II.2: an entity's position on a map is the weighted average of that
+   * map's well anchors; parents sit at the centroid of their children
+   * (II.4's position rule, adopted early — full II.4 rendering comes later).
+   */
+  function semanticPositions(mapId) {
+    const anchors = anchorsFor(mapId);
+    const pos = new Map();
+    for (const n of graph.nodes) {
+      const p = weightedPosition(n.weights?.[mapId], anchors);
+      if (p) pos.set(n.id, p);
+    }
+    for (const fam of families) {
+      const c = centroid(fam.children.map((ch) => pos.get(ch.id)));
+      if (c) pos.set(fam.parent.id, c);
+    }
+    return pos;
   }
 
-  // §4c persistence: dragged-and-snapped positions survive reloads
-  // (per-browser). "Reset layout" clears them.
+  /**
+   * Pin the semantic skeleton for one map, settle the free satellites around
+   * it (links/charge/collision — §4d/§4e carried over), relax labels, and
+   * snapshot every node. Nodes with no data for this map (v1 CSV nodes have
+   * business-only weights) keep their previous coordinates: no cultural
+   * data → they don't fly.
+   */
+  function settleMap(mapId, warm) {
+    const pos = semanticPositions(mapId);
+    for (const n of graph.nodes) {
+      const p = pos.get(n.id);
+      if (p) {
+        n.x = n.fx = p.x;
+        n.y = n.fy = p.y;
+      } else if (warm && !(state.neighborHubs.get(n.id)?.size > 0) && n.weights?.business) {
+        n.fx = n.x; // isolated business-only node: carry position, stay pinned
+        n.fy = n.y;
+      } else {
+        n.fx = null;
+        n.fy = null;
+      }
+    }
+    // Entities with identical map profiles compute the EXACT same weighted
+    // position (all single-dominant Business profiles stack per well; e.g.
+    // Workday/Cisco share a cultural profile too). Seed coincident pinned
+    // nodes with a tiny deterministic phyllotaxis offset so the relax pass
+    // below can fan them out around the shared semantic point.
+    const seen = new Map();
+    for (const n of graph.nodes) {
+      if (n.fx == null) continue;
+      const key = `${Math.round(n.fx)},${Math.round(n.fy)}`;
+      const count = seen.get(key) || 0;
+      if (count > 0) {
+        const a = count * 2.399963;
+        const r = 34 * Math.sqrt(count);
+        n.x = n.fx = n.fx + r * Math.cos(a);
+        n.y = n.fy = n.fy + r * Math.sin(a);
+      }
+      seen.set(key, count + 1);
+    }
+
+    simulation.alpha(0.9);
+    for (let i = 0; i < SETTLE_TICKS; i++) simulation.tick();
+    // Relax pass moves pins too (movePinned): stacked same-profile entities
+    // separate for legibility while staying centered on their shared well —
+    // the fan-out is rendering, not semantics.
+    const relax = forceLabelCollide(true);
+    relax.initialize(graph.nodes);
+    for (let i = 0; i < 260; i++) relax();
+    // Family ring radius per map = mean child distance from the centroid —
+    // a rendering stopgap until II.4's concentric rings.
+    for (const fam of families) {
+      const p = pos.get(fam.parent.id);
+      fam.ring = fam.ring || {};
+      fam.ring[mapId] = p ? d3.mean(fam.children, (ch) => Math.hypot(ch.x - p.x, ch.y - p.y)) : 0;
+    }
+    const snapshot = new Map();
+    for (const n of graph.nodes) snapshot.set(n.id, { x: n.x, y: n.y, pinned: pos.has(n.id) });
+    return snapshot;
+  }
+
+  // Dual settle: business from the cold phyllotaxis start, cultural warm-
+  // started from the business result. Deterministic both ways — every node
+  // ends up with two coordinates.
+  const mapPositions = {
+    business: settleMap('business', false),
+    cultural: settleMap('cultural', true),
+  };
+
+  function applyMap(mapId) {
+    state.map = mapId;
+    for (const n of graph.nodes) {
+      const p = mapPositions[mapId].get(n.id);
+      n.homeX = n.x = p.x;
+      n.homeY = n.y = p.y;
+      if (p.pinned) {
+        n.fx = p.x;
+        n.fy = p.y;
+      } else {
+        n.fx = null;
+        n.fy = null;
+      }
+    }
+    simulation.force('x').x((n) => n.homeX).strength(ANCHOR_STRENGTH);
+    simulation.force('y').y((n) => n.homeY).strength(ANCHOR_STRENGTH);
+    simulation.alpha(0);
+  }
+  applyMap('business');
+
+  // §4c persistence carried over this phase (II.5 retires dragging later):
+  // a saved placement pins the node identically in BOTH maps — it won't fly
+  // on toggle until "Reset layout".
   const saved = loadSavedLayout();
   for (const n of graph.nodes) {
     if (Array.isArray(saved[n.id])) {
@@ -365,111 +398,13 @@ function render(graph) {
     }
   }
 
-  // §6a.1 orbital layout: children take fixed angular slots around their
-  // parent at a computed radius (solar-system style), replacing the old
-  // convex-hull blob. Slots are assigned by each child's settled angle so
-  // nothing travels far; a user's own saved placement outranks its slot.
-  for (const fam of families) {
-    // The parent is the ring's center — pin it so the re-settle can't drift
-    // it off the orbit its children are slotted around.
-    fam.parent.fx = fam.parent.homeX;
-    fam.parent.fy = fam.parent.homeY;
-    const slots = orbitalSlots(
-      { x: fam.parent.homeX, y: fam.parent.homeY },
-      fam.children,
-      fam.radius
-    );
-    for (const child of fam.children) {
-      child.orbital = true;
-      let target = slots.get(child.id);
-      if (Array.isArray(saved[child.id])) {
-        // §6a.1b: a user-placed child persists its ANGLE around the parent;
-        // the radius always normalizes to the (possibly recomputed) orbit,
-        // so a saved child can never reload detached from its ring.
-        const a = Math.atan2(
-          saved[child.id][1] - fam.parent.homeY,
-          saved[child.id][0] - fam.parent.homeX
-        );
-        target = {
-          x: fam.parent.homeX + fam.radius * Math.cos(a),
-          y: fam.parent.homeY + fam.radius * Math.sin(a),
-        };
-      }
-      // Pin children on the ring (§6a.1): their own satellite links can't
-      // tug them off it. Dragging still works — the drag handler overrides
-      // fx/fy for its duration.
-      child.homeX = child.x = child.fx = target.x;
-      child.homeY = child.y = child.fy = target.y;
-    }
-  }
-
-  simulation
-    .force('x', d3.forceX((d) => d.homeX).strength((d) => (d.orbital ? 0.7 : ANCHOR_STRENGTH)))
-    .force('y', d3.forceY((d) => d.homeY).strength((d) => (d.orbital ? 0.7 : ANCHOR_STRENGTH)));
-
-  // Re-settle so each relocated child's own satellites follow it to the new
-  // slot, then freeze those equilibria as the free nodes' homes. Full settle
-  // length: the wider orbits displace a lot of neighbors.
-  simulation.alpha(0.6);
-  for (let i = 0; i < SETTLE_TICKS; i++) simulation.tick();
-
-  // Relaxation pass: run ONLY the label-collide constraint for a few dozen
-  // iterations. During the force settle, a free node squeezed between pinned
-  // orbit boxes and its own link tension can oscillate instead of escaping —
-  // with the opposing forces silenced, boxes separate fully.
-  const relaxExclusion = forceOrbitExclusion(families);
-  relaxExclusion.initialize(graph.nodes);
-  const relax = forceLabelCollide();
-  relax.initialize(graph.nodes);
-  for (let i = 0; i < 80; i++) {
-    relaxExclusion();
-    relax();
-  }
-
-  for (const n of graph.nodes) {
-    if (!n.orbital && !Array.isArray(saved[n.id])) {
-      n.homeX = n.x;
-      n.homeY = n.y;
-    }
-  }
-  simulation.alpha(0);
-
-  /* §4f sector boundaries: faint grid lines + corner labels, no fills —
-     node fill color already carries relevance/identity meaning (§5/§5a). */
-  sectorLayer
-    .selectAll('line.sector-v')
-    .data([0, 1, 2, 3])
-    .join('line')
-    .attr('class', 'sector-line sector-v')
-    .attr('x1', (i) => gridX0 + i * SECTOR_W)
-    .attr('x2', (i) => gridX0 + i * SECTOR_W)
-    .attr('y1', gridY0)
-    .attr('y2', gridY0 + 2 * SECTOR_H);
-  sectorLayer
-    .selectAll('line.sector-h')
-    .data([0, 1, 2])
-    .join('line')
-    .attr('class', 'sector-line sector-h')
-    .attr('x1', gridX0)
-    .attr('x2', gridX0 + 3 * SECTOR_W)
-    .attr('y1', (i) => gridY0 + i * SECTOR_H)
-    .attr('y2', (i) => gridY0 + i * SECTOR_H);
-  sectorLayer
-    .selectAll('text')
-    .data(SECTORS)
-    .join('text')
-    .attr('class', 'sector-label')
-    .attr('x', (s) => gridX0 + s.col * SECTOR_W + 16)
-    .attr('y', (s) => gridY0 + s.row * SECTOR_H + 28)
-    .text((s) => s.label);
-
-  /* dashed orbit paths behind the children (§6a.1, optional rendering) */
+  /* dashed family rings at per-map mean child distance (II.4 stopgap) */
   const orbits = hullLayer
     .selectAll('circle')
     .data(families)
     .join('circle')
     .attr('class', 'orbit-path')
-    .attr('r', (d) => d.radius);
+    .attr('r', (d) => d.ring[state.map] || 0);
 
   /* links */
   const link = linkLayer
@@ -545,14 +480,14 @@ function render(graph) {
   svg.call(zoom).on('dblclick.zoom', null);
   svg.on('click', () => clearSelection());
 
-  // Default view = the whole settled map, fit with padding. Reset returns here.
-  function fitTransform() {
-    const pad = 60;
-    const nx = d3.extent(graph.nodes, (d) => d.homeX);
-    const ny = d3.extent(graph.nodes, (d) => d.homeY);
-    // Include the sector grid so empty sectors (Sports, CPGs) stay on-chart.
-    const xs = [Math.min(nx[0], gridX0), Math.max(nx[1], gridX0 + 3 * SECTOR_W)];
-    const ys = [Math.min(ny[0], gridY0), Math.max(ny[1], gridY0 + 2 * SECTOR_H)];
+  // Default view = the active map's node extents, fit with padding. The two
+  // landscapes have different footprints (grid vs ellipse), so fit follows
+  // the map being shown.
+  function fitTransform(mapId = state.map) {
+    const pad = 80;
+    const pts = [...mapPositions[mapId].values()];
+    const xs = d3.extent(pts, (p) => p.x);
+    const ys = d3.extent(pts, (p) => p.y);
     const dx = xs[1] - xs[0] + pad * 2;
     const dy = ys[1] - ys[0] + pad * 2;
     const k = Math.min(width / dx, height / dy, 1.4);
@@ -562,6 +497,69 @@ function render(graph) {
   }
   document.getElementById('reset-view').addEventListener('click', () => {
     svg.transition().duration(500).call(zoom.transform, fitTransform());
+  });
+
+  /* II.2 map toggle: every node flies from its current-map position to its
+     other-map position — the travel distance itself is the signal (a company
+     that barely moves behaves conventionally for its category). */
+  let flying = false;
+  function switchMap(mapId) {
+    if (flying || mapId === state.map) return;
+    flying = true;
+    state.map = mapId;
+    document.querySelectorAll('#map-toggle button').forEach((b) =>
+      b.classList.toggle('active', b.dataset.map === mapId)
+    );
+    const targets = mapPositions[mapId];
+    const savedNow = loadSavedLayout();
+    const starts = new Map(graph.nodes.map((n) => [n.id, { x: n.x, y: n.y }]));
+    const ringStarts = new Map(families.map((f) => [f, f.renderRing ?? f.ring[mapId === 'business' ? 'cultural' : 'business']]));
+
+    d3.select({})
+      .transition()
+      .duration(MAP_TRANSITION_MS)
+      .ease(d3.easeCubicInOut)
+      .tween('fly', () => (t) => {
+        for (const n of graph.nodes) {
+          if (Array.isArray(savedNow[n.id])) continue; // user-pinned: stays put
+          const s = starts.get(n.id);
+          const p = targets.get(n.id);
+          n.x = s.x + (p.x - s.x) * t;
+          n.y = s.y + (p.y - s.y) * t;
+          if (n.fx != null) {
+            n.fx = n.x;
+            n.fy = n.y;
+          }
+        }
+        for (const f of families) {
+          const from = ringStarts.get(f) || 0;
+          f.renderRing = from + ((f.ring[mapId] || 0) - from) * t;
+        }
+        orbits.attr('r', (f) => f.renderRing || 0);
+        ticked();
+      })
+      .on('end', () => {
+        for (const n of graph.nodes) {
+          if (Array.isArray(savedNow[n.id])) continue;
+          const p = targets.get(n.id);
+          n.homeX = n.x = p.x;
+          n.homeY = n.y = p.y;
+          if (p.pinned) {
+            n.fx = p.x;
+            n.fy = p.y;
+          } else {
+            n.fx = null;
+            n.fy = null;
+          }
+        }
+        simulation.force('x').x((n) => n.homeX);
+        simulation.force('y').y((n) => n.homeY);
+        flying = false;
+      });
+    svg.transition().duration(MAP_TRANSITION_MS).ease(d3.easeCubicInOut).call(zoom.transform, fitTransform(mapId));
+  }
+  document.querySelectorAll('#map-toggle button').forEach((btn) => {
+    btn.addEventListener('click', () => switchMap(btn.dataset.map));
   });
   document.getElementById('reset-layout').addEventListener('click', () => {
     localStorage.removeItem(LAYOUT_KEY);
@@ -717,42 +715,12 @@ function render(graph) {
   applyFilters();
 
   // Debug hook for force-tuning sessions (harmless in production).
-  window.__cluster = { state, simulation };
+  window.__cluster = { state, simulation, mapPositions, switchMap, families };
 }
 
-/* --------------------------------------- orbit exclusion force (6a.1a) */
-
-/**
- * Each family's orbit disc is an exclusion zone (§6a.1a): a non-family node
- * sitting inside the ring falsely reads as affiliated with the parent
- * (Twisted Tea inside the MABI orbit). Treat the orbit as a fixed circular
- * obstacle — any outside node that strays within it gets pushed radially out
- * to the boundary. Center follows the parent's LIVE position, so the zone
- * moves with a dragged parent. One zone per family; pinned nodes (orbit
- * slots, user placements) are never moved — same rule as label collide.
- */
-function forceOrbitExclusion(families) {
-  let nodes;
-
-  function force() {
-    for (const fam of families) {
-      const cx = fam.parent.x;
-      const cy = fam.parent.y;
-      const familyIds = new Set([fam.parent.id, ...fam.children.map((c) => c.id)]);
-      for (const n of nodes) {
-        if (n.fx != null || familyIds.has(n.id)) continue;
-        const out = radialEscape(n.x, n.y, cx, cy, fam.radius + n.r + 12);
-        if (out) {
-          n.x = out.x;
-          n.y = out.y;
-        }
-      }
-    }
-  }
-
-  force.initialize = (n) => (nodes = n);
-  return force;
-}
+/* NOTE: the §6a.1a orbit-exclusion force was removed with Map Engine v2 —
+   II.4 says the exclusion concept needs fresh design for the multi-radius
+   concentric model rather than being carried over. */
 
 /* ------------------------------------------- label collision force (4d) */
 
@@ -767,9 +735,23 @@ function forceOrbitExclusion(families) {
  * by alpha — otherwise it fades away exactly when the layout is settling.
  * O(n²) pairwise is fine at this graph size (~130 nodes).
  */
-function forceLabelCollide() {
+function forceLabelCollide(movePinned = false) {
   let nodes;
   const strength = 0.5;
+
+  // movePinned (relax-pass only): identical-profile entities land on the
+  // EXACT same semantic point on a map, and both are pinned — someone has to
+  // give. In the post-settle relax the pins themselves fan out around the
+  // shared point (fx/fy shift with x/y); during the live simulation pins are
+  // sacrosanct (user drags, semantic anchors).
+  const shift = (n, dx, dy) => {
+    n.x += dx;
+    n.y += dy;
+    if (n.fx != null) {
+      n.fx += dx;
+      n.fy += dy;
+    }
+  };
 
   function force() {
     for (let i = 0; i < nodes.length; i++) {
@@ -782,33 +764,32 @@ function forceLabelCollide() {
         const by = b.y + b.boxCy;
         const oy = a.boxHh + b.boxHh - Math.abs(by - ay);
         if (oy <= 0) continue;
-        const aFree = a.fx == null;
-        const bFree = b.fx == null;
+        const aFree = movePinned || a.fx == null;
+        const bFree = movePinned || b.fx == null;
         if (!aFree && !bFree) continue; // both pinned/dragged — leave them
         if (aFree && bFree) {
           // Both movable: split the push along the axis of least overlap.
           if (ox < oy) {
             const push = ox * 0.5 * strength * (b.x > a.x ? 1 : -1);
-            a.x -= push;
-            b.x += push;
+            shift(a, -push, 0);
+            shift(b, push, 0);
           } else {
             const push = oy * 0.5 * strength * (by > ay ? 1 : -1);
-            a.y -= push;
-            b.y += push;
+            shift(a, 0, -push);
+            shift(b, 0, push);
           }
         } else {
-          // One side is pinned (orbit slot / user placement): push the free
-          // node RADIALLY away from the pinned box. Axis pushes cancel when a
-          // node is squeezed in the corridor between two pinned boxes;
-          // radial pushes compose outward and let it escape.
+          // One side is pinned (user placement): push the free node RADIALLY
+          // away from the pinned box. Axis pushes cancel when a node is
+          // squeezed in the corridor between two pinned boxes; radial pushes
+          // compose outward and let it escape.
           const free = aFree ? a : b;
           const pin = aFree ? b : a;
           let vx = free.x - pin.x;
           let vy = free.y + free.boxCy - (pin.y + pin.boxCy);
           const len = Math.hypot(vx, vy) || 1;
           const push = Math.min(ox, oy) * strength;
-          free.x += (vx / len) * push;
-          free.y += (vy / len) * push;
+          shift(free, (vx / len) * push, (vy / len) * push);
         }
       }
     }
@@ -942,8 +923,6 @@ function showPanel(d) {
   parts.push(`<h2>${esc(d.name)}</h2>`);
   const sub = [d.type === 'hub' ? 'G7 client hub' : d.type === 'parent' ? 'Corporate parent' : 'Adjacent brand'];
   if (d.category) sub.push(esc(d.category));
-  const sector = SECTORS.find((s) => s.id === d.sector);
-  if (sector) sub.push(esc(sector.label));
   parts.push(`<div class="subtitle">${sub.join(' · ')}</div>`);
 
   const badges = [];
@@ -981,6 +960,22 @@ function showPanel(d) {
       );
     }
     parts.push('</p>');
+  }
+
+  /* II.1 vertical profiles — displayed as 0–5 (stored as normalized weights) */
+  const profileSection = (title, scores, taxonomy) => {
+    const rows = taxonomy
+      .filter((v) => (scores?.[v.id] || 0) > 0)
+      .sort((a, b) => scores[b.id] - scores[a.id])
+      .map((v) => `<li>${esc(v.label)} — <strong>${esc(scores[v.id])}</strong>/5</li>`);
+    if (rows.length) parts.push(`<h3>${title}</h3><ul>${rows.join('')}</ul>`);
+  };
+  if (d.business_verticals || d.cultural_verticals) {
+    profileSection('Business profile (0–5)', d.business_verticals, BUSINESS_VERTICALS);
+    profileSection('Cultural profile (0–5)', d.cultural_verticals, CULTURAL_VERTICALS);
+    parts.push(
+      '<p class="rel-note">Provisional stub scoring (dominant vertical + rough derived secondaries) — real multi-vertical scoring is pending follow-up work.</p>'
+    );
   }
 
   /* notes */

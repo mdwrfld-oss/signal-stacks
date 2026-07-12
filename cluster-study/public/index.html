@@ -13,6 +13,10 @@
       <span id="brand-title">Cluster Study</span>
       <span id="source-badge" title="Where the current graph data came from"></span>
     </div>
+    <div id="map-toggle" role="group" aria-label="Landscape">
+      <button data-map="business" class="active" title="Position = what each company sells (business-vertical wells)">Business Landscape</button>
+      <button data-map="cultural" title="Position = how each company behaves as a marketer (cultural-vertical wells)">Cultural Landscape</button>
+    </div>
     <div id="lens-toggle" role="group" aria-label="Lens">
       <button data-lens="all" class="active">All</button>
       <button data-lens="experiential">Experiential</button>
@@ -45,7 +49,7 @@
       <div class="legend-row"><span class="swatch ring ring-signal"></span> Signal ring (Signal Stacks detection or RFP event)</div>
       <div class="legend-row"><span class="swatch ring ring-sister"></span> Sister agency (Project Worldwide)</div>
       <div class="legend-row"><span class="swatch pulse"></span> New addition — pulsing glow (first week)</div>
-      <div class="legend-row"><span class="swatch orbit"></span> Corporate family orbit (children circle their parent)</div>
+      <div class="legend-row"><span class="swatch orbit"></span> Corporate family ring (mean sibling distance from centroid)</div>
     </div>
 
     <div id="status">Loading…</div>

@@ -53,9 +53,9 @@ body { display: flex; flex-direction: column; }
   padding: 1px 8px;
 }
 
-#lens-toggle, #filter-toggles { display: flex; border-radius: 8px; overflow: hidden; }
+#lens-toggle, #filter-toggles, #map-toggle { display: flex; border-radius: 8px; overflow: hidden; }
 #filter-toggles { gap: 1px; }
-#lens-toggle button, #filter-toggles button {
+#lens-toggle button, #filter-toggles button, #map-toggle button {
   border: none;
   padding: 6px 14px;
   background: rgba(255, 255, 255, 0.14);
@@ -64,6 +64,9 @@ body { display: flex; flex-direction: column; }
   font-size: 13px;
 }
 #lens-toggle button.active, #filter-toggles button.active { background: #fff; color: var(--g7-purple); font-weight: 600; }
+/* II.2 landscape toggle — the primary control, visually weightier. */
+#map-toggle { border: 1px solid rgba(255, 255, 255, 0.35); }
+#map-toggle button.active { background: #fff; color: var(--g7-purple); font-weight: 700; }
 
 #controls { margin-left: auto; display: flex; gap: 8px; }
 #search {
