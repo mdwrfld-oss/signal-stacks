@@ -319,7 +319,7 @@ The ideation conversation's "fixed cultural landmarks" concept (Live Nation, Coa
 
 ### II.10 Open / pending decisions (Part II)
 1. **Business verticals list** — the existing 6 (Food & Beverage, Automotive & Transportation, Technology & B2B, CPGs, Sports, Hospitality/Travel/Tourism) need to be revisited now that they're weighted-score wells rather than exclusive single-assignment categories, not simply carried over as-is. **Still open.**
-2. **Cultural verticals list — resolved, starting set (subject to revision):** Music (Performance), Sports, Gaming, Comedy, Festival, Talent & Celebrity Partnerships, Film & Television Inclusion, College Marketing, Outdoor & Adventure, Inter-Brand Collaborations (unexpected brand mashups — e.g., Crocs × KFC), Creator & Influencer Partnerships, Wellness & Fitness. **11 wells total.** Explicitly expected to evolve — not a final taxonomy. Music's flagship-tactic status (should it get dedicated treatment ahead of the others, e.g. an "inbound to Music" view) remains an open follow-on question.
+2. **Cultural verticals list — resolved, starting set (subject to revision):** Music (Performance), Sports, Gaming, Comedy, Festival, Talent & Celebrity Partnerships, Film/TV, Inclusion, College Marketing, Outdoor & Adventure, Inter-Brand Collaborations (unexpected brand mashups — e.g., Crocs × KFC), Creator & Influencer Partnerships, Wellness & Fitness. **13 wells total** (Film/TV and Inclusion confirmed as separate categories — see Part III, III.3). Explicitly expected to evolve — not a final taxonomy. Music's flagship-tactic status (should it get dedicated treatment ahead of the others, e.g. an "inbound to Music" view) remains an open follow-on question.
 3. ~~Sister-agency ring color conflict~~ — **Resolved:** `#B83A1A` (G7 red), see II.3 and Part I 5a.1.
 4. **Floor-state node glow treatment** — unresolved, flagged in II.3.
 5. **Drop-shadow reconciliation** — unresolved, flagged in II.3.
@@ -341,6 +341,37 @@ Every signal Signal Stacks surfaces needs a new LLM classification pass, in addi
 **Not required (per II.9):** any landmark-detection extraction — that concept has been dropped, so no pipeline work is needed for it.
 
 This is a genuinely new extraction category for Signal Stacks' existing Haiku pipeline, parallel to the already-flagged ownership-change extraction (Part I, 6a.5 / Flag 7) — worth scoping together as related pipeline additions rather than as isolated one-offs.
+
+## PART III: Cultural Affinity Processor — the Signals↔Clusters bridge (added this session)
+
+Full spec: `G7_Cultural_Affinity_Processor_Spec.md` (companion doc — preserved in full there rather than duplicated here). This section covers cross-references and reconciliation with earlier Part II decisions only.
+
+### III.1 What this is
+A distinct middleware layer between Signal Stacks and Cluster Study — not a Cluster feature and not a Signal Stacks feature, but its own subdevelopment. Signals discovers raw activity; the Cultural Affinity Processor classifies it against the Culture Space taxonomy and turns it into two persistent scores per entity per category (**Established Affinity** — stable, historical — and **Recent Momentum** — time-sensitive, current); Clusters only renders the processed output.
+
+### III.2 This supersedes Part II's simpler mechanics — needs your confirmation
+This spec is considerably more mature than what Part II sketched earlier this session, and appears to replace rather than sit alongside it:
+- **II.6's flat 4-week/6-level arrow decay schedule** is superseded by this spec's evidence-threshold model — momentum updates continuously and stable-affinity only recalculates when repeated signals accumulate, a long-term platform is announced, or a category reaches a configured evidence threshold (Section 6 of the spec). More sophisticated, category-aware, and explicitly avoids the "one announcement overcorrects the score" problem the same way, just with a stronger mechanism.
+- **II.8/II.11's brief "add a classification layer to the Haiku pipeline" note** is now the full 12-section spec — Section III.11 below replaces those flags' scope entirely.
+- **II.7's G7 Gravity** remains conceptually the same, but now has real inputs to draw from (III.8 of the spec: capability fit, recent momentum, lookalike strength, opportunity timing all pull from this processor's output) rather than being calculated from thin air.
+
+**Not superseded:** II.1–II.5 (data model, dual-map positioning, color/glow model, family/orbit rendering, dragging policy) are unaffected — this processor feeds the *scores*, not the rendering mechanics.
+
+### III.3 Film/TV vs. Inclusion — resolved this session
+**Split confirmed, not merged.** Film/TV refers specifically to how much a brand invests in TV/movie spots, product placement, and screen presence. Inclusion is a separate DEI-focused category (authenticity, LGBTQ+, disability, gender equity commitments) — genuinely useful on its own for talent and strategy decisions, not a subset of Film/TV. **Culture Space now has 13 wells, not 12.**
+
+**Data consequence:** the existing 14 entities' merged `film_tv_inclusion` scores were split in the JSON — preserved as `film_tv` (the old value), with a new `inclusion` field set to **null**. A single merged number doesn't reveal how much of it was screen presence versus DEI commitment, so **all 18 entities (14 existing + 4 new) need a fresh, separate Inclusion score** — this is real follow-up scoring work, not a data-migration formality.
+
+### III.4 Real data now exists
+The user has produced an FPO (for-placement-only) scoring pass across the cultural verticals for 14 existing hub nodes, now merged into `G7_Cluster_Study_Seed_Data.json` as each node's `cultural_verticals` object. Four new signal-sourced entities surfaced through this pass and were added as new hub nodes (non-client, `confidence: "signal_sourced"`): **Ulta Beauty, Reddit, Stella Artois, Professional Lacrosse League (PLL).**
+
+**Resolved this session:**
+- **Ulta Beauty's parent field** — the "Ultra" note was a user typo, not a real relationship. Corrected; Ulta Beauty is a standalone cosmetics retailer with no connection to Mojo Energy's competitor of a similar name.
+- **Jackson Hole Mountain Resort restructured** — JHMR is the parent/hosting resort; **Rendezvous Music Festival is the actual G7 client program** and is now the scored hub node (id renamed from `jackson_hole` to `rendezvous_music_festival`). JHMR itself is added as a new `corporate_parents` entry, same pattern as Mark Anthony Brands/Intuit/Swisher.
+
+**Still open:** the Image 1 → Image 2 row alignment was inferred by position (matching row counts), not explicit labels — worth a quick spot-check against the source sheet if not already confirmed.
+
+**Note:** `business_verticals` (Part II, II.1) has not been touched by this pass — only cultural scoring has real data so far; business-vertical re-scoring remains separate, unstarted work.
 
 ## 7. Data dependencies (the real blocker)
 
@@ -438,7 +469,7 @@ These items surfaced in Cluster planning but are implementation work that belong
 5. **Talent Booking schema needs two additions once the rubric is built** (Section 10): a structured `talent_name` field, and a way to distinguish **booking type** — one-off engagement vs. ongoing/exclusive partnership. Both are needed for Cluster's Talent-side refinements, but they're schema decisions that belong in the Talent Booking rubric design, not retrofitted after the fact.
 6. **Scout vocabulary enrichment (ancillary, low priority).** Once the `talent_name` field exists, a simple scheduled (cron-pull, not real-time) diff could feed newly-identified artist names from the Backbone Sheet into Scout's entity vocabulary. No urgency; worth doing once Scout and Signal Stacks are both stable, not before. Depends on knowing how Scout's vocabulary is currently stored — not yet confirmed.
 7. **New — ownership-change extraction.** Section 6a.5 proposes adding an ownership-change extraction category (acquirer, acquired entity, date) to the existing RSS/Haiku pipeline, with a human-approval gate before it mutates Cluster's parent/child graph. Worth scoping alongside the existing extraction categories rather than as a fully separate pipeline.
-8. **New — Map Engine v2 classification layer (Part II, Section II.11).** A larger pipeline addition than Flag 7: every signal needs cultural-territory tagging (once the cultural vertical list is defined, Part II II.10), a business-vs-momentum signal-type classification (feeds the 6-level, 4-week arrow decay schedule, II.6), and business-vertical relevance where applicable — kept strictly separate from cultural tagging. Worth scoping together with Flag 7's ownership-change extraction as related pipeline additions. **Explicitly not required:** any landmark-detection extraction — that concept was evaluated and dropped (Part II, II.9) as unverifiable and noisy at the systematic level this pipeline would need.
+8. **Superseded/expanded — Map Engine v2 classification layer.** What was a brief flag here is now the full **Cultural Affinity Processor** spec — see Part III and the companion doc `G7_Cultural_Affinity_Processor_Spec.md`. This is a distinct middleware subdevelopment between Signals and Clusters, not a small addition to the existing Haiku pipeline — worth scoping as its own initiative rather than folding into Flag 7's ownership-change extraction.
 
 ---
 

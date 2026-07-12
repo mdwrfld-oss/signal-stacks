@@ -57,9 +57,9 @@ const RING_GAP = 4;
  * node between them. This replaces Part I §4f's sector grid/force entirely.
  */
 const MAP_TRANSITION_MS = 1100;
-// Business wells: 3×2 grid of anchor points (6 verticals).
+// Business wells: 3×3 grid of anchor points (9 verticals).
 const BIZ_COL_STEP = 720;
-const BIZ_ROW_STEP = 660;
+const BIZ_ROW_STEP = 620;
 // Cultural wells: 12 anchor points on an ellipse.
 const CULT_RX = 900;
 const CULT_RY = 640;
@@ -71,6 +71,7 @@ const state = {
   signalsOnly: false, // §4g
   dimCompetitors: false, // §4g
   map: 'business', // II.2: active landscape
+  isolatedWell: null, // II.3: active cultural gravity-well isolation
   selected: null,
   k: 1,
   effective: new Map(),
@@ -79,15 +80,13 @@ const state = {
   analogPairs: [],
 };
 
-// §5c dark canvas flips the relevance encoding direction: on a star chart,
-// MORE relevance = a BRIGHTER star (same meaning — more salient — as "darker"
-// was on the light background).
-// Non-client fill: dim violet → bright lavender by relevance (only once a
-// real live signal exists — otherwise floor-gray).
-const fillScale = d3.interpolateRgb('#3c3357', '#b79aff');
-// §5a client fill: confirmed G7 clients are ALWAYS purple — a clearly-purple
-// resting shade, brightening within the family as signals arrive.
-const clientFillScale = d3.interpolateRgb('#6a48b8', '#d4bfff');
+/* II.3 color model: the purple fill gradient is gone. Base state — clients
+ * glow white, signaled non-clients glow gray fading with signal age, floor
+ * nodes are dim placeholders (open design question; deliberately unpolished).
+ * The map's identity color lives ONLY in interaction feedback (--map-accent:
+ * business purple / cultural yellow) and well isolation. */
+const MAP_ACCENT = { business: '#9a6cd3', cultural: '#ffd22e' };
+const isolationFill = d3.interpolateRgb('#211e15', '#ffd22e');
 
 // §5c idle drift (resolves open question 4b in favor of "yes, drift"):
 // stars drift gently at rest. Purely visual — the offset is applied to the
@@ -222,6 +221,23 @@ function render(graph) {
   const { width, height } = document.getElementById('stage').getBoundingClientRect();
   svg.attr('viewBox', [0, 0, width, height]);
 
+  // II.3 static starfield: screen-space (outside the viewport transform), so
+  // it neither pans nor zooms — identical backdrop on both maps.
+  const starRand = (() => {
+    let s = 42 >>> 0;
+    return () => ((s = (s * 1664525 + 1013904223) >>> 0), s / 4294967296);
+  })();
+  const starLayer = svg.append('g').attr('id', 'starfield');
+  for (let i = 0; i < 160; i++) {
+    starLayer
+      .append('circle')
+      .attr('cx', starRand() * width)
+      .attr('cy', starRand() * height)
+      .attr('r', 0.4 + starRand() * 0.9)
+      .attr('fill', '#cdd3ff')
+      .attr('opacity', 0.1 + starRand() * 0.35);
+  }
+
   const viewport = svg.append('g').attr('id', 'viewport').attr('class', 'zoomed-out');
   const hullLayer = viewport.append('g');
   const linkLayer = viewport.append('g');
@@ -235,7 +251,7 @@ function render(graph) {
   const businessAnchors = new Map(
     BUSINESS_VERTICALS.map((v, i) => [
       v.id,
-      { x: cx + ((i % 3) - 1) * BIZ_COL_STEP, y: cy + (Math.floor(i / 3) - 0.5) * BIZ_ROW_STEP },
+      { x: cx + ((i % 3) - 1) * BIZ_COL_STEP, y: cy + (Math.floor(i / 3) - 1) * BIZ_ROW_STEP },
     ])
   );
   const culturalAnchors = new Map(
@@ -346,7 +362,7 @@ function render(graph) {
     // the fan-out is rendering, not semantics.
     const relax = forceLabelCollide(true);
     relax.initialize(graph.nodes);
-    for (let i = 0; i < 260; i++) relax();
+    for (let i = 0; i < 420; i++) relax();
     // Family ring radius per map = mean child distance from the centroid —
     // a rendering stopgap until II.4's concentric rings.
     for (const fam of families) {
@@ -428,20 +444,93 @@ function render(graph) {
   node
     .append('circle')
     .attr('class', 'core')
-    // §5b: shadows lift parents + owned clients off the canvas; adjacent and
-    // floor-state nodes stay flat, reinforcing the §5a purple/gray split.
-    .classed('elevated', (d) => d.is_g7_client || d.type === 'parent')
     // §9/§11 revision: new additions pulse brighter for their first week —
     // this REPLACES the old red new-addition ring.
     .classed('new-pulse', (d) => d.isNew)
-    .attr('r', (d) => d.r)
-    .attr('fill', (d) =>
-      d.is_g7_client
-        ? clientFillScale(d.relevance)
-        : d.floor
-          ? 'var(--floor-gray)'
-          : fillScale(Math.max(0.06, d.relevance))
+    .attr('r', (d) => d.r);
+
+  /**
+   * II.3 glow engine — the single writer of node fill/glow. Two modes:
+   * - default: clients white, signaled non-clients gray with glow opacity
+   *   fading with signal age (relevance already encodes strength × recency,
+   *   including 6a.3 propagation), floor nodes dim placeholders.
+   * - well isolation (cultural map): EVERY entity re-glows in the Cultural
+   *   accent, intensity scaled to its STORED 0–5 score for the selected well
+   *   — the score field directly, never distance-from-anchor (a node's
+   *   position is a weighted average, so it can sit far from a well it
+   *   scores 5 on).
+   */
+  function applyGlow() {
+    const well = state.map === 'cultural' ? state.isolatedWell : null;
+    node.select('circle.core').each(function (d) {
+      const c = d3.select(this);
+      c.classed('glow-client', false).classed('glow-floor', false);
+      if (well) {
+        const s = (d.cultural_verticals?.[well] || 0) / 5;
+        c.style('fill', isolationFill(s))
+          .style('opacity', 0.3 + 0.7 * s)
+          .style(
+            'filter',
+            s > 0.02
+              ? `drop-shadow(0 0 ${4 + 9 * s}px rgba(255,210,46,${0.2 + 0.75 * s}))`
+              : 'none'
+          );
+        return;
+      }
+      c.style('opacity', null);
+      if (d.is_g7_client) {
+        c.style('fill', '#f5f3ff').style('filter', null).classed('glow-client', true);
+      } else if (!d.floor) {
+        const a = 0.25 + 0.6 * Math.min(1, d.relevance);
+        c.style('fill', '#8f8fa3').style(
+          'filter',
+          `drop-shadow(0 0 5px rgba(205,205,220,${a})) drop-shadow(0 0 12px rgba(180,180,205,${a * 0.6}))`
+        );
+      } else {
+        c.style('fill', 'var(--floor-gray)').style('filter', null).classed('glow-floor', true);
+      }
+    });
+  }
+  applyGlow();
+
+  /* II.3 gravity-well isolation rail — Cultural Landscape only. One well at
+     a time; clicking the active button (or Clear) returns to default glow.
+     The Business equivalent is explicitly out of scope this pass. */
+  const rail = document.getElementById('well-rail');
+  for (const v of CULTURAL_VERTICALS) {
+    const btn = document.createElement('button');
+    btn.dataset.well = v.id;
+    btn.textContent = v.label;
+    btn.title = `Isolate ${v.label}: glow scales to each entity's stored 0–5 score`;
+    rail.appendChild(btn);
+  }
+  const clearBtn = document.createElement('button');
+  clearBtn.className = 'well-clear';
+  clearBtn.textContent = 'Clear';
+  rail.appendChild(clearBtn);
+
+  function setIsolatedWell(wellId) {
+    state.isolatedWell = wellId;
+    rail.querySelectorAll('button[data-well]').forEach((b) =>
+      b.classList.toggle('active', b.dataset.well === wellId)
     );
+    applyGlow();
+  }
+  rail.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b === clearBtn) return setIsolatedWell(null);
+    setIsolatedWell(b.dataset.well === state.isolatedWell ? null : b.dataset.well);
+  });
+
+  /* II.3 map accent + rail visibility follow the active landscape. */
+  function applyMapChrome(mapId) {
+    document.documentElement.style.setProperty('--map-accent', MAP_ACCENT[mapId]);
+    rail.classList.toggle('hidden', mapId !== 'cultural');
+    if (mapId !== 'cultural' && state.isolatedWell) setIsolatedWell(null);
+    else applyGlow();
+  }
+  applyMapChrome(state.map);
 
   // Concentric ring stack (open question #9/#11): color-only at default zoom,
   // text labels past the zoom threshold.
@@ -510,6 +599,7 @@ function render(graph) {
     document.querySelectorAll('#map-toggle button').forEach((b) =>
       b.classList.toggle('active', b.dataset.map === mapId)
     );
+    applyMapChrome(mapId);
     const targets = mapPositions[mapId];
     const savedNow = loadSavedLayout();
     const starts = new Map(graph.nodes.map((n) => [n.id, { x: n.x, y: n.y }]));
@@ -942,7 +1032,7 @@ function showPanel(d) {
   /* relevance / signal state */
   parts.push('<h3>Signal</h3>');
   if (d.floor && d.is_g7_client) {
-    parts.push('<p class="rel-note">Confirmed G7 client — renders in base G7 purple regardless of live-signal status (§5a). No live signal yet; a real signal will darken the shade.</p>');
+    parts.push('<p class="rel-note">Confirmed G7 client — glows white regardless of live-signal status (II.3). No live signal on record yet.</p>');
   } else if (d.floor) {
     parts.push('<p class="rel-note">Floor state — no live signal yet. Here as research/environmental context; Signal Stacks lights this up when a real signal arrives.</p>');
   } else {

@@ -24,15 +24,24 @@
       "technology_b2b",
       "cpgs",
       "sports",
-      "hospitality_travel_tourism"
+      "hospitality_travel_tourism",
+      "beauty_retail",
+      "media_social_platforms",
+      "entertainment"
     ],
-    "vertical_notes": "cpgs and sports currently have no hub nodes — both are real, defined sectors awaiting future roster additions, not errors.",
+    "vertical_notes": "RESOLVED 2026-07-11 (Part II, II.10 open question #1): the original 6 verticals were single-assignment categorical labels; the single 'vertical' field on each hub node has been removed and replaced with a 'business_verticals' object (0-5 weighted score per well, mirroring 'cultural_verticals'). Expanded from 6 to 9 wells this pass -- added beauty_retail and media_social_platforms to accommodate signal-sourced entities (Ulta Beauty, Reddit) that didn't fit the original 6, and added entertainment per the plan doc's own Liquid Death hybrid-brand example (Part II, II.1). cpgs and sports, previously empty, now have partial coverage (Mojo Energy Pouches scores 4 on cpgs; PLL scores 5 on sports) -- still worth broadening with future roster additions.",
     "ring_types": {
       "signal": "teal — unified ring for Signal Stacks detection and RFP-sourced events (v1 build only; re-evaluate under Map Engine v2's white/gray glow model)",
       "sister_agency": "#B83A1A (G7 red) — Project Worldwide sister-agency relationship"
     },
     "new_addition_treatment": "pulsing glow (brighter + slow pulse) for first week, not a separate ring type",
-    "map_engine_v2_status": "Planned as a separate v2 branch/rebuild. See G7_Cluster_Study_Plan.md Part II. Cultural verticals list (11, subject to revision): music_performance, sports, gaming, comedy, festival, talent_celebrity_partnerships, film_tv_inclusion, college_marketing, outdoor_adventure, inter_brand_collaborations, creator_influencer_partnerships, wellness_fitness. Business verticals list needs revisiting as weighted wells rather than single-assignment categories. Hub nodes do NOT yet have cultural_verticals or re-scored business_verticals fields — that data entry is future work once the v2 branch starts."
+    "map_engine_v2_status": "Planned as a separate v2 branch/rebuild. See G7_Cluster_Study_Plan.md Part II. Cultural verticals list (11, subject to revision): music_performance, sports, gaming, comedy, festival, talent_celebrity_partnerships, film_tv_inclusion, college_marketing, outdoor_adventure, inter_brand_collaborations, creator_influencer_partnerships, wellness_fitness. Business verticals list needs revisiting as weighted wells rather than single-assignment categories. Hub nodes do NOT yet have cultural_verticals or re-scored business_verticals fields — that data entry is future work once the v2 branch starts.",
+    "jackson_hole_flag": "Resolved — Jackson Hole Mountain Resort (JHMR) is now a corporate_parents entry; Rendezvous Music Festival is the scored hub node (id renamed from 'jackson_hole').",
+    "cultural_verticals_note": "Applied from user FPO sheet 2026-07-11. business_verticals migration (Phase 1, Part II.1) not yet reflected here — still separate follow-up work.",
+    "vertical_notes_update": "Film/TV and Inclusion confirmed as two separate cultural verticals (13 wells total, not merged). Existing 'film_tv_inclusion' scores were split: renamed to 'film_tv' (score preserved), with a new 'inclusion' field. RESOLVED 2026-07-11: all 19 entities now have an Inclusion score (two user-provided FPO batches). One data gap surfaced during this pass and was fixed separately: rendezvous_music_festival had no cultural_verticals object at all (missed by both the original 14-entity and later 4-new-entity FPO rounds) -- it now has the full 13-well object with Inclusion (2) populated and the remaining 12 wells null, still needing a scoring pass. Mojo Energy Pouches' Inclusion was set to 1 (no evidence found) -- its parent/operating-entity structure (Swisher subsidiary) remains a separate unresolved question, flagged on the node itself and in corporate_parents.",
+    "business_verticals_source": "Claude first-pass draft across all 19 hub nodes, reviewed and corrected by user 2026-07-11. See vertical_notes for taxonomy-expansion rationale. Scores are a first pass built from category descriptions, not deep per-entity research -- most entities score high on exactly one well; real cross-vertical research (the kind the cultural pass received) is future work, not done here.",
+    "rendezvous_cultural_gap_resolved": "RESOLVED 2026-07-11: rendezvous_music_festival now has a complete 13-well cultural_verticals object (previously missing entirely -- see vertical_notes_update). All 19 hub nodes now have complete cultural_verticals scoring.",
+    "inclusion_scale_resolved": "RESOLVED 2026-07-11: the four half-point Inclusion scores (Atlassian, Workday, Reddit, PLL -- originally 4.5) were rounded down to 4 to keep the integer 0-5 scale consistent across cultural_verticals and business_verticals. Cisco and Ulta Beauty's Inclusion scores of 5 were already whole numbers and are unaffected."
   },
   "hub_nodes": [
     {
@@ -83,8 +92,35 @@
         "relationship_notes": "Part of the Mark Anthony Brands relationship — G7's warmest client relationship overall. Historically included talent booking; that has recently changed (Experiential only going forward)."
       },
       "is_g7_client": true,
-      "vertical": "food_beverage",
-      "sister_agency": false
+      "sister_agency": false,
+      "cultural_verticals": {
+        "music_performance": 5,
+        "sports": 3,
+        "gaming": 1,
+        "comedy": 3,
+        "festival": 5,
+        "talent_celebrity_partnerships": 5,
+        "college_marketing": 1,
+        "outdoor_adventure": 3,
+        "inter_brand_collaborations": 4,
+        "creator_influencer_partnerships": 4,
+        "wellness_fitness": 1,
+        "film_tv": 1,
+        "inclusion": 3
+      },
+      "cultural_verticals_source": "FPO sheet, user-provided 2026-07-11 — pending Film/TV vs Inclusion split resolution Inclusion score added 2026-07-11 from user-provided FPO pass (partial -- see plan doc III.4 / flags for entities not yet covered).",
+      "business_verticals": {
+        "food_beverage": 5,
+        "automotive_transportation": 1,
+        "technology_b2b": 1,
+        "cpgs": 1,
+        "sports": 1,
+        "hospitality_travel_tourism": 1,
+        "beauty_retail": 1,
+        "media_social_platforms": 1,
+        "entertainment": 3
+      },
+      "business_verticals_source": "Claude first-pass draft, reviewed and corrected by user 2026-07-11 (added entertainment well; adjusted Rendezvous, White Claw, Liquid Death, Reddit, PLL entertainment scores). Business verticals list expanded from 6 to 9 wells this session (added beauty_retail, media_social_platforms, entertainment) to accommodate signal-sourced entities (Ulta Beauty, Reddit) and the plan doc's own Liquid Death hybrid-brand example (Part II, II.1)."
     },
     {
       "id": "liquid_death",
@@ -135,8 +171,35 @@
         }
       ],
       "is_g7_client": true,
-      "vertical": "food_beverage",
-      "sister_agency": false
+      "sister_agency": false,
+      "cultural_verticals": {
+        "music_performance": 5,
+        "sports": 4,
+        "gaming": 1,
+        "comedy": 5,
+        "festival": 5,
+        "talent_celebrity_partnerships": 5,
+        "college_marketing": 1,
+        "outdoor_adventure": 2,
+        "inter_brand_collaborations": 5,
+        "creator_influencer_partnerships": 4,
+        "wellness_fitness": 3,
+        "film_tv": 3,
+        "inclusion": 2
+      },
+      "cultural_verticals_source": "FPO sheet, user-provided 2026-07-11 — pending Film/TV vs Inclusion split resolution Inclusion score added 2026-07-11 from user-provided FPO pass (partial -- see plan doc III.4 / flags for entities not yet covered).",
+      "business_verticals": {
+        "food_beverage": 5,
+        "automotive_transportation": 1,
+        "technology_b2b": 1,
+        "cpgs": 1,
+        "sports": 1,
+        "hospitality_travel_tourism": 1,
+        "beauty_retail": 1,
+        "media_social_platforms": 1,
+        "entertainment": 3
+      },
+      "business_verticals_source": "Claude first-pass draft, reviewed and corrected by user 2026-07-11 (added entertainment well; adjusted Rendezvous, White Claw, Liquid Death, Reddit, PLL entertainment scores). Business verticals list expanded from 6 to 9 wells this session (added beauty_retail, media_social_platforms, entertainment) to accommodate signal-sourced entities (Ulta Beauty, Reddit) and the plan doc's own Liquid Death hybrid-brand example (Part II, II.1)."
     },
     {
       "id": "fireball_whiskey",
@@ -177,8 +240,35 @@
         }
       ],
       "is_g7_client": true,
-      "vertical": "food_beverage",
-      "sister_agency": false
+      "sister_agency": false,
+      "cultural_verticals": {
+        "music_performance": 1,
+        "sports": 4,
+        "gaming": 1,
+        "comedy": 5,
+        "festival": 1,
+        "talent_celebrity_partnerships": 4,
+        "college_marketing": 2,
+        "outdoor_adventure": 2,
+        "inter_brand_collaborations": 2,
+        "creator_influencer_partnerships": 3,
+        "wellness_fitness": 1,
+        "film_tv": 1,
+        "inclusion": 1
+      },
+      "cultural_verticals_source": "FPO sheet, user-provided 2026-07-11 — pending Film/TV vs Inclusion split resolution Inclusion score added 2026-07-11 from user-provided FPO pass (partial -- see plan doc III.4 / flags for entities not yet covered).",
+      "business_verticals": {
+        "food_beverage": 5,
+        "automotive_transportation": 1,
+        "technology_b2b": 1,
+        "cpgs": 1,
+        "sports": 1,
+        "hospitality_travel_tourism": 1,
+        "beauty_retail": 1,
+        "media_social_platforms": 1,
+        "entertainment": 1
+      },
+      "business_verticals_source": "Claude first-pass draft, reviewed and corrected by user 2026-07-11 (added entertainment well; adjusted Rendezvous, White Claw, Liquid Death, Reddit, PLL entertainment scores). Business verticals list expanded from 6 to 9 wells this session (added beauty_retail, media_social_platforms, entertainment) to accommodate signal-sourced entities (Ulta Beauty, Reddit) and the plan doc's own Liquid Death hybrid-brand example (Part II, II.1)."
     },
     {
       "id": "ram_trucks",
@@ -219,8 +309,35 @@
         }
       ],
       "is_g7_client": true,
-      "vertical": "automotive_transportation",
-      "sister_agency": false
+      "sister_agency": false,
+      "cultural_verticals": {
+        "music_performance": 1,
+        "sports": 5,
+        "gaming": 1,
+        "comedy": 1,
+        "festival": 1,
+        "talent_celebrity_partnerships": 4,
+        "college_marketing": 1,
+        "outdoor_adventure": 5,
+        "inter_brand_collaborations": 4,
+        "creator_influencer_partnerships": 3,
+        "wellness_fitness": 1,
+        "film_tv": 3,
+        "inclusion": 2
+      },
+      "cultural_verticals_source": "FPO sheet, user-provided 2026-07-11 — pending Film/TV vs Inclusion split resolution Inclusion score added 2026-07-11 from user-provided FPO pass (partial -- see plan doc III.4 / flags for entities not yet covered).",
+      "business_verticals": {
+        "food_beverage": 1,
+        "automotive_transportation": 5,
+        "technology_b2b": 1,
+        "cpgs": 1,
+        "sports": 1,
+        "hospitality_travel_tourism": 1,
+        "beauty_retail": 1,
+        "media_social_platforms": 1,
+        "entertainment": 1
+      },
+      "business_verticals_source": "Claude first-pass draft, reviewed and corrected by user 2026-07-11 (added entertainment well; adjusted Rendezvous, White Claw, Liquid Death, Reddit, PLL entertainment scores). Business verticals list expanded from 6 to 9 wells this session (added beauty_retail, media_social_platforms, entertainment) to accommodate signal-sourced entities (Ulta Beauty, Reddit) and the plan doc's own Liquid Death hybrid-brand example (Part II, II.1)."
     },
     {
       "id": "turbotax_intuit",
@@ -260,8 +377,35 @@
         "relationship_notes": "Lapsed — last worked together roughly a year ago, not a current client. G7 has done both Experiential and Talent Booking work for them, at both the TurboTax and Intuit corporate level."
       },
       "is_g7_client": false,
-      "vertical": "technology_b2b",
-      "sister_agency": false
+      "sister_agency": false,
+      "cultural_verticals": {
+        "music_performance": 2,
+        "sports": 4,
+        "gaming": 3,
+        "comedy": 4,
+        "festival": 1,
+        "talent_celebrity_partnerships": 3,
+        "college_marketing": 4,
+        "outdoor_adventure": 1,
+        "inter_brand_collaborations": 4,
+        "creator_influencer_partnerships": 3,
+        "wellness_fitness": 1,
+        "film_tv": 4,
+        "inclusion": 3
+      },
+      "cultural_verticals_source": "FPO sheet, user-provided 2026-07-11 — pending Film/TV vs Inclusion split resolution Inclusion score added 2026-07-11 from user-provided FPO pass (partial -- see plan doc III.4 / flags for entities not yet covered).",
+      "business_verticals": {
+        "food_beverage": 1,
+        "automotive_transportation": 1,
+        "technology_b2b": 5,
+        "cpgs": 1,
+        "sports": 1,
+        "hospitality_travel_tourism": 1,
+        "beauty_retail": 1,
+        "media_social_platforms": 1,
+        "entertainment": 1
+      },
+      "business_verticals_source": "Claude first-pass draft, reviewed and corrected by user 2026-07-11 (added entertainment well; adjusted Rendezvous, White Claw, Liquid Death, Reddit, PLL entertainment scores). Business verticals list expanded from 6 to 9 wells this session (added beauty_retail, media_social_platforms, entertainment) to accommodate signal-sourced entities (Ulta Beauty, Reddit) and the plan doc's own Liquid Death hybrid-brand example (Part II, II.1)."
     },
     {
       "id": "atlassian",
@@ -302,8 +446,35 @@
         }
       ],
       "is_g7_client": true,
-      "vertical": "technology_b2b",
-      "sister_agency": false
+      "sister_agency": false,
+      "cultural_verticals": {
+        "music_performance": 1,
+        "sports": 4,
+        "gaming": 1,
+        "comedy": 1,
+        "festival": 1,
+        "talent_celebrity_partnerships": 3,
+        "college_marketing": 1,
+        "outdoor_adventure": 1,
+        "inter_brand_collaborations": 3,
+        "creator_influencer_partnerships": 1,
+        "wellness_fitness": 1,
+        "film_tv": 1,
+        "inclusion": 4
+      },
+      "cultural_verticals_source": "FPO sheet, user-provided 2026-07-11 — pending Film/TV vs Inclusion split resolution Inclusion score added 2026-07-11, user-provided (second batch).",
+      "business_verticals": {
+        "food_beverage": 1,
+        "automotive_transportation": 1,
+        "technology_b2b": 5,
+        "cpgs": 1,
+        "sports": 1,
+        "hospitality_travel_tourism": 1,
+        "beauty_retail": 1,
+        "media_social_platforms": 1,
+        "entertainment": 1
+      },
+      "business_verticals_source": "Claude first-pass draft, reviewed and corrected by user 2026-07-11 (added entertainment well; adjusted Rendezvous, White Claw, Liquid Death, Reddit, PLL entertainment scores). Business verticals list expanded from 6 to 9 wells this session (added beauty_retail, media_social_platforms, entertainment) to accommodate signal-sourced entities (Ulta Beauty, Reddit) and the plan doc's own Liquid Death hybrid-brand example (Part II, II.1)."
     },
     {
       "id": "subaru",
@@ -348,8 +519,35 @@
         "relationship_notes": "Current client. G7 has pitched for additional Experiential business without success, and separately pitched Talent Booking business that also did not close (RFP: Lost, Talent lane) — worth surfacing as a lookalike-search trigger per Section 6."
       },
       "is_g7_client": true,
-      "vertical": "automotive_transportation",
-      "sister_agency": true
+      "sister_agency": true,
+      "cultural_verticals": {
+        "music_performance": 1,
+        "sports": 4,
+        "gaming": 1,
+        "comedy": 1,
+        "festival": 1,
+        "talent_celebrity_partnerships": 3,
+        "college_marketing": 1,
+        "outdoor_adventure": 5,
+        "inter_brand_collaborations": 4,
+        "creator_influencer_partnerships": 2,
+        "wellness_fitness": 2,
+        "film_tv": 2,
+        "inclusion": 4
+      },
+      "cultural_verticals_source": "FPO sheet, user-provided 2026-07-11 — pending Film/TV vs Inclusion split resolution Inclusion score added 2026-07-11 from user-provided FPO pass (partial -- see plan doc III.4 / flags for entities not yet covered).",
+      "business_verticals": {
+        "food_beverage": 1,
+        "automotive_transportation": 5,
+        "technology_b2b": 1,
+        "cpgs": 1,
+        "sports": 1,
+        "hospitality_travel_tourism": 1,
+        "beauty_retail": 1,
+        "media_social_platforms": 1,
+        "entertainment": 1
+      },
+      "business_verticals_source": "Claude first-pass draft, reviewed and corrected by user 2026-07-11 (added entertainment well; adjusted Rendezvous, White Claw, Liquid Death, Reddit, PLL entertainment scores). Business verticals list expanded from 6 to 9 wells this session (added beauty_retail, media_social_platforms, entertainment) to accommodate signal-sourced entities (Ulta Beauty, Reddit) and the plan doc's own Liquid Death hybrid-brand example (Part II, II.1)."
     },
     {
       "id": "lagunitas",
@@ -389,13 +587,40 @@
         "relationship_notes": "A few programs per year. Client-side organization makes long-term planning difficult."
       },
       "is_g7_client": true,
-      "vertical": "food_beverage",
-      "sister_agency": true
+      "sister_agency": true,
+      "cultural_verticals": {
+        "music_performance": 5,
+        "sports": 1,
+        "gaming": 1,
+        "comedy": 3,
+        "festival": 4,
+        "talent_celebrity_partnerships": 4,
+        "college_marketing": 1,
+        "outdoor_adventure": 3,
+        "inter_brand_collaborations": 4,
+        "creator_influencer_partnerships": 2,
+        "wellness_fitness": 1,
+        "film_tv": 1,
+        "inclusion": 1
+      },
+      "cultural_verticals_source": "FPO sheet, user-provided 2026-07-11 — pending Film/TV vs Inclusion split resolution Inclusion score added 2026-07-11 from user-provided FPO pass (partial -- see plan doc III.4 / flags for entities not yet covered).",
+      "business_verticals": {
+        "food_beverage": 5,
+        "automotive_transportation": 1,
+        "technology_b2b": 1,
+        "cpgs": 1,
+        "sports": 1,
+        "hospitality_travel_tourism": 1,
+        "beauty_retail": 1,
+        "media_social_platforms": 1,
+        "entertainment": 1
+      },
+      "business_verticals_source": "Claude first-pass draft, reviewed and corrected by user 2026-07-11 (added entertainment well; adjusted Rendezvous, White Claw, Liquid Death, Reddit, PLL entertainment scores). Business verticals list expanded from 6 to 9 wells this session (added beauty_retail, media_social_platforms, entertainment) to accommodate signal-sourced entities (Ulta Beauty, Reddit) and the plan doc's own Liquid Death hybrid-brand example (Part II, II.1)."
     },
     {
-      "id": "jackson_hole",
-      "name": "Jackson Hole Mountain Resort / Rendezvous",
-      "category": "Ski resort / mountain hospitality",
+      "id": "rendezvous_music_festival",
+      "name": "Rendezvous Music Festival",
+      "category": "Music festival / experiential program",
       "zone": "combo",
       "confidence": "established",
       "adjacent": [
@@ -432,11 +657,39 @@
       ],
       "g7_notes": {
         "case_study_learnings": "G7 manages the Rendezvous Music Festival end-to-end (Experiential + Talent Booking). Attendance has trended down in recent years since the festival shifted from free to paid admission.",
-        "relationship_notes": "Yearly client; work is expected to continue."
+        "relationship_notes": "Yearly client; work is expected to continue.",
+        "parent_note": "Parent entity is Jackson Hole Mountain Resort (JHMR) — the festival is G7's actual client program; JHMR itself is the hosting resort, not directly scored."
       },
       "is_g7_client": true,
-      "vertical": "hospitality_travel_tourism",
-      "sister_agency": false
+      "sister_agency": false,
+      "business_verticals": {
+        "food_beverage": 1,
+        "automotive_transportation": 1,
+        "technology_b2b": 1,
+        "cpgs": 1,
+        "sports": 1,
+        "hospitality_travel_tourism": 3,
+        "beauty_retail": 1,
+        "media_social_platforms": 1,
+        "entertainment": 5
+      },
+      "business_verticals_source": "Claude first-pass draft, reviewed and corrected by user 2026-07-11 (added entertainment well; adjusted Rendezvous, White Claw, Liquid Death, Reddit, PLL entertainment scores). Business verticals list expanded from 6 to 9 wells this session (added beauty_retail, media_social_platforms, entertainment) to accommodate signal-sourced entities (Ulta Beauty, Reddit) and the plan doc's own Liquid Death hybrid-brand example (Part II, II.1).",
+      "cultural_verticals": {
+        "music_performance": 5,
+        "sports": 2,
+        "gaming": 1,
+        "comedy": 1,
+        "festival": 5,
+        "talent_celebrity_partnerships": 4,
+        "film_tv": 2,
+        "inclusion": 2,
+        "college_marketing": 2,
+        "outdoor_adventure": 4,
+        "inter_brand_collaborations": 1,
+        "creator_influencer_partnerships": 2,
+        "wellness_fitness": 3
+      },
+      "cultural_verticals_source": "Full 13-well cultural scoring added 2026-07-11, user-provided FPO sheet -- closes the gap where this node was originally missed by both the 14-entity and 4-new-entity FPO rounds. Inclusion score (2) matches the value provided separately in the earlier Inclusion-only pass, confirming consistency."
     },
     {
       "id": "workday",
@@ -472,8 +725,35 @@
         }
       ],
       "is_g7_client": true,
-      "vertical": "technology_b2b",
-      "sister_agency": false
+      "sister_agency": false,
+      "cultural_verticals": {
+        "music_performance": 5,
+        "sports": 5,
+        "gaming": 1,
+        "comedy": 4,
+        "festival": 1,
+        "talent_celebrity_partnerships": 5,
+        "college_marketing": 1,
+        "outdoor_adventure": 1,
+        "inter_brand_collaborations": 3,
+        "creator_influencer_partnerships": 2,
+        "wellness_fitness": 1,
+        "film_tv": 4,
+        "inclusion": 4
+      },
+      "cultural_verticals_source": "FPO sheet, user-provided 2026-07-11 — pending Film/TV vs Inclusion split resolution Inclusion score added 2026-07-11, user-provided (second batch).",
+      "business_verticals": {
+        "food_beverage": 1,
+        "automotive_transportation": 1,
+        "technology_b2b": 5,
+        "cpgs": 1,
+        "sports": 1,
+        "hospitality_travel_tourism": 1,
+        "beauty_retail": 1,
+        "media_social_platforms": 1,
+        "entertainment": 1
+      },
+      "business_verticals_source": "Claude first-pass draft, reviewed and corrected by user 2026-07-11 (added entertainment well; adjusted Rendezvous, White Claw, Liquid Death, Reddit, PLL entertainment scores). Business verticals list expanded from 6 to 9 wells this session (added beauty_retail, media_social_platforms, entertainment) to accommodate signal-sourced entities (Ulta Beauty, Reddit) and the plan doc's own Liquid Death hybrid-brand example (Part II, II.1)."
     },
     {
       "id": "cisco",
@@ -509,8 +789,35 @@
         }
       ],
       "is_g7_client": true,
-      "vertical": "technology_b2b",
-      "sister_agency": false
+      "sister_agency": false,
+      "cultural_verticals": {
+        "music_performance": 1,
+        "sports": 5,
+        "gaming": 4,
+        "comedy": 1,
+        "festival": 1,
+        "talent_celebrity_partnerships": 1,
+        "college_marketing": 2,
+        "outdoor_adventure": 1,
+        "inter_brand_collaborations": 2,
+        "creator_influencer_partnerships": 1,
+        "wellness_fitness": 1,
+        "film_tv": 4,
+        "inclusion": 5
+      },
+      "cultural_verticals_source": "FPO sheet, user-provided 2026-07-11 — pending Film/TV vs Inclusion split resolution Inclusion score added 2026-07-11, user-provided (second batch).",
+      "business_verticals": {
+        "food_beverage": 1,
+        "automotive_transportation": 1,
+        "technology_b2b": 5,
+        "cpgs": 1,
+        "sports": 1,
+        "hospitality_travel_tourism": 1,
+        "beauty_retail": 1,
+        "media_social_platforms": 1,
+        "entertainment": 1
+      },
+      "business_verticals_source": "Claude first-pass draft, reviewed and corrected by user 2026-07-11 (added entertainment well; adjusted Rendezvous, White Claw, Liquid Death, Reddit, PLL entertainment scores). Business verticals list expanded from 6 to 9 wells this session (added beauty_retail, media_social_platforms, entertainment) to accommodate signal-sourced entities (Ulta Beauty, Reddit) and the plan doc's own Liquid Death hybrid-brand example (Part II, II.1)."
     },
     {
       "id": "mikes_hard_lemonade",
@@ -538,8 +845,35 @@
         }
       ],
       "is_g7_client": true,
-      "vertical": "food_beverage",
-      "sister_agency": false
+      "sister_agency": false,
+      "cultural_verticals": {
+        "music_performance": 3,
+        "sports": 4,
+        "gaming": 1,
+        "comedy": 3,
+        "festival": 1,
+        "talent_celebrity_partnerships": 4,
+        "college_marketing": 2,
+        "outdoor_adventure": 2,
+        "inter_brand_collaborations": 2,
+        "creator_influencer_partnerships": 2,
+        "wellness_fitness": 1,
+        "film_tv": 1,
+        "inclusion": 2
+      },
+      "cultural_verticals_source": "FPO sheet, user-provided 2026-07-11 — pending Film/TV vs Inclusion split resolution Inclusion score added 2026-07-11 from user-provided FPO pass (partial -- see plan doc III.4 / flags for entities not yet covered).",
+      "business_verticals": {
+        "food_beverage": 5,
+        "automotive_transportation": 1,
+        "technology_b2b": 1,
+        "cpgs": 1,
+        "sports": 1,
+        "hospitality_travel_tourism": 1,
+        "beauty_retail": 1,
+        "media_social_platforms": 1,
+        "entertainment": 1
+      },
+      "business_verticals_source": "Claude first-pass draft, reviewed and corrected by user 2026-07-11 (added entertainment well; adjusted Rendezvous, White Claw, Liquid Death, Reddit, PLL entertainment scores). Business verticals list expanded from 6 to 9 wells this session (added beauty_retail, media_social_platforms, entertainment) to accommodate signal-sourced entities (Ulta Beauty, Reddit) and the plan doc's own Liquid Death hybrid-brand example (Part II, II.1)."
     },
     {
       "id": "cayman_jack",
@@ -588,8 +922,35 @@
         }
       ],
       "is_g7_client": true,
-      "vertical": "food_beverage",
-      "sister_agency": false
+      "sister_agency": false,
+      "cultural_verticals": {
+        "music_performance": 3,
+        "sports": 1,
+        "gaming": 1,
+        "comedy": 2,
+        "festival": 4,
+        "talent_celebrity_partnerships": 2,
+        "college_marketing": 1,
+        "outdoor_adventure": 4,
+        "inter_brand_collaborations": 3,
+        "creator_influencer_partnerships": 3,
+        "wellness_fitness": 1,
+        "film_tv": 1,
+        "inclusion": 1
+      },
+      "cultural_verticals_source": "FPO sheet, user-provided 2026-07-11 — pending Film/TV vs Inclusion split resolution Inclusion score added 2026-07-11 from user-provided FPO pass (partial -- see plan doc III.4 / flags for entities not yet covered).",
+      "business_verticals": {
+        "food_beverage": 5,
+        "automotive_transportation": 1,
+        "technology_b2b": 1,
+        "cpgs": 1,
+        "sports": 1,
+        "hospitality_travel_tourism": 1,
+        "beauty_retail": 1,
+        "media_social_platforms": 1,
+        "entertainment": 1
+      },
+      "business_verticals_source": "Claude first-pass draft, reviewed and corrected by user 2026-07-11 (added entertainment well; adjusted Rendezvous, White Claw, Liquid Death, Reddit, PLL entertainment scores). Business verticals list expanded from 6 to 9 wells this session (added beauty_retail, media_social_platforms, entertainment) to accommodate signal-sourced entities (Ulta Beauty, Reddit) and the plan doc's own Liquid Death hybrid-brand example (Part II, II.1)."
     },
     {
       "id": "ole",
@@ -624,8 +985,35 @@
         }
       ],
       "is_g7_client": true,
-      "vertical": "food_beverage",
-      "sister_agency": false
+      "sister_agency": false,
+      "cultural_verticals": {
+        "music_performance": 2,
+        "sports": 3,
+        "gaming": 1,
+        "comedy": 1,
+        "festival": 3,
+        "talent_celebrity_partnerships": 1,
+        "college_marketing": 1,
+        "outdoor_adventure": 4,
+        "inter_brand_collaborations": 3,
+        "creator_influencer_partnerships": 4,
+        "wellness_fitness": 2,
+        "film_tv": 1,
+        "inclusion": 1
+      },
+      "cultural_verticals_source": "FPO sheet, user-provided 2026-07-11 — pending Film/TV vs Inclusion split resolution Inclusion score added 2026-07-11 from user-provided FPO pass (partial -- see plan doc III.4 / flags for entities not yet covered).",
+      "business_verticals": {
+        "food_beverage": 5,
+        "automotive_transportation": 1,
+        "technology_b2b": 1,
+        "cpgs": 1,
+        "sports": 1,
+        "hospitality_travel_tourism": 1,
+        "beauty_retail": 1,
+        "media_social_platforms": 1,
+        "entertainment": 1
+      },
+      "business_verticals_source": "Claude first-pass draft, reviewed and corrected by user 2026-07-11 (added entertainment well; adjusted Rendezvous, White Claw, Liquid Death, Reddit, PLL entertainment scores). Business verticals list expanded from 6 to 9 wells this session (added beauty_retail, media_social_platforms, entertainment) to accommodate signal-sourced entities (Ulta Beauty, Reddit) and the plan doc's own Liquid Death hybrid-brand example (Part II, II.1)."
     },
     {
       "id": "mojo_energy",
@@ -670,8 +1058,199 @@
         }
       ],
       "is_g7_client": true,
-      "vertical": "food_beverage",
-      "sister_agency": false
+      "sister_agency": false,
+      "cultural_verticals": {
+        "music_performance": 1,
+        "sports": 1,
+        "gaming": 1,
+        "comedy": 1,
+        "festival": 1,
+        "talent_celebrity_partnerships": 1,
+        "college_marketing": 1,
+        "outdoor_adventure": 2,
+        "inter_brand_collaborations": 1,
+        "creator_influencer_partnerships": 2,
+        "wellness_fitness": 4,
+        "film_tv": 1,
+        "inclusion": 1
+      },
+      "cultural_verticals_source": "FPO sheet, user-provided 2026-07-11 — pending Film/TV vs Inclusion split resolution Inclusion: parent/operating-entity structure unresolved per 2026-07-11 FPO pass -- flagged N/A, not yet scorable. Inclusion set to 1 (no evidence found) 2026-07-11 -- parent/operating-entity question remains separately unresolved (see note above).",
+      "business_verticals": {
+        "food_beverage": 2,
+        "automotive_transportation": 1,
+        "technology_b2b": 1,
+        "cpgs": 4,
+        "sports": 1,
+        "hospitality_travel_tourism": 1,
+        "beauty_retail": 1,
+        "media_social_platforms": 1,
+        "entertainment": 1
+      },
+      "business_verticals_source": "Claude first-pass draft, reviewed and corrected by user 2026-07-11 (added entertainment well; adjusted Rendezvous, White Claw, Liquid Death, Reddit, PLL entertainment scores). Business verticals list expanded from 6 to 9 wells this session (added beauty_retail, media_social_platforms, entertainment) to accommodate signal-sourced entities (Ulta Beauty, Reddit) and the plan doc's own Liquid Death hybrid-brand example (Part II, II.1)."
+    },
+    {
+      "id": "ulta_beauty",
+      "name": "Ulta Beauty",
+      "category": "Beauty & cosmetics retail",
+      "zone": "unassigned",
+      "confidence": "signal_sourced",
+      "is_g7_client": false,
+      "sister_agency": false,
+      "adjacent": [],
+      "g7_notes": {
+        "relationship_notes": "New signal-sourced entity from FPO cultural scoring pass. Standalone cosmetics retailer — earlier parent-field note ('Ultra') was a user typo, corrected; no relationship to the unrelated Mojo Energy competitor of the same near-name."
+      },
+      "cultural_verticals": {
+        "music_performance": 5,
+        "sports": 4,
+        "gaming": 1,
+        "comedy": 1,
+        "festival": 4,
+        "talent_celebrity_partnerships": 5,
+        "college_marketing": 5,
+        "outdoor_adventure": 1,
+        "inter_brand_collaborations": 5,
+        "creator_influencer_partnerships": 5,
+        "wellness_fitness": 5,
+        "film_tv": 5,
+        "inclusion": 5
+      },
+      "cultural_verticals_source": "FPO sheet, user-provided 2026-07-11 — pending Film/TV vs Inclusion split resolution Inclusion score added 2026-07-11, user-provided (second batch).",
+      "business_verticals": {
+        "food_beverage": 1,
+        "automotive_transportation": 1,
+        "technology_b2b": 1,
+        "cpgs": 2,
+        "sports": 1,
+        "hospitality_travel_tourism": 1,
+        "beauty_retail": 5,
+        "media_social_platforms": 1,
+        "entertainment": 1
+      },
+      "business_verticals_source": "Claude first-pass draft, reviewed and corrected by user 2026-07-11 (added entertainment well; adjusted Rendezvous, White Claw, Liquid Death, Reddit, PLL entertainment scores). Business verticals list expanded from 6 to 9 wells this session (added beauty_retail, media_social_platforms, entertainment) to accommodate signal-sourced entities (Ulta Beauty, Reddit) and the plan doc's own Liquid Death hybrid-brand example (Part II, II.1)."
+    },
+    {
+      "id": "reddit",
+      "name": "Reddit",
+      "category": "Social media / online community platform",
+      "zone": "unassigned",
+      "confidence": "signal_sourced",
+      "is_g7_client": false,
+      "sister_agency": false,
+      "adjacent": [],
+      "g7_notes": {
+        "relationship_notes": "New signal-sourced entity from FPO cultural scoring pass."
+      },
+      "cultural_verticals": {
+        "music_performance": 2,
+        "sports": 4,
+        "gaming": 5,
+        "comedy": 4,
+        "festival": 2,
+        "talent_celebrity_partnerships": 2,
+        "college_marketing": 4,
+        "outdoor_adventure": 1,
+        "inter_brand_collaborations": 4,
+        "creator_influencer_partnerships": 2,
+        "wellness_fitness": 1,
+        "film_tv": 4,
+        "inclusion": 4
+      },
+      "cultural_verticals_source": "FPO sheet, user-provided 2026-07-11 — pending Film/TV vs Inclusion split resolution Inclusion score added 2026-07-11, user-provided (second batch).",
+      "business_verticals": {
+        "food_beverage": 1,
+        "automotive_transportation": 1,
+        "technology_b2b": 2,
+        "cpgs": 1,
+        "sports": 1,
+        "hospitality_travel_tourism": 1,
+        "beauty_retail": 1,
+        "media_social_platforms": 5,
+        "entertainment": 4
+      },
+      "business_verticals_source": "Claude first-pass draft, reviewed and corrected by user 2026-07-11 (added entertainment well; adjusted Rendezvous, White Claw, Liquid Death, Reddit, PLL entertainment scores). Business verticals list expanded from 6 to 9 wells this session (added beauty_retail, media_social_platforms, entertainment) to accommodate signal-sourced entities (Ulta Beauty, Reddit) and the plan doc's own Liquid Death hybrid-brand example (Part II, II.1)."
+    },
+    {
+      "id": "stella_artois",
+      "name": "Stella Artois",
+      "category": "Beer",
+      "zone": "unassigned",
+      "confidence": "signal_sourced",
+      "is_g7_client": false,
+      "sister_agency": false,
+      "adjacent": [],
+      "g7_notes": {
+        "relationship_notes": "New signal-sourced entity from FPO cultural scoring pass. Parent: Anheuser-Busch."
+      },
+      "cultural_verticals": {
+        "music_performance": 1,
+        "sports": 5,
+        "gaming": 1,
+        "comedy": 3,
+        "festival": 1,
+        "talent_celebrity_partnerships": 4,
+        "college_marketing": 1,
+        "outdoor_adventure": 1,
+        "inter_brand_collaborations": 3,
+        "creator_influencer_partnerships": 2,
+        "wellness_fitness": 1,
+        "film_tv": 4,
+        "inclusion": 3
+      },
+      "cultural_verticals_source": "FPO sheet, user-provided 2026-07-11 — pending Film/TV vs Inclusion split resolution Inclusion score added 2026-07-11 from user-provided FPO pass (partial -- see plan doc III.4 / flags for entities not yet covered).",
+      "business_verticals": {
+        "food_beverage": 5,
+        "automotive_transportation": 1,
+        "technology_b2b": 1,
+        "cpgs": 1,
+        "sports": 1,
+        "hospitality_travel_tourism": 1,
+        "beauty_retail": 1,
+        "media_social_platforms": 1,
+        "entertainment": 1
+      },
+      "business_verticals_source": "Claude first-pass draft, reviewed and corrected by user 2026-07-11 (added entertainment well; adjusted Rendezvous, White Claw, Liquid Death, Reddit, PLL entertainment scores). Business verticals list expanded from 6 to 9 wells this session (added beauty_retail, media_social_platforms, entertainment) to accommodate signal-sourced entities (Ulta Beauty, Reddit) and the plan doc's own Liquid Death hybrid-brand example (Part II, II.1)."
+    },
+    {
+      "id": "pll",
+      "name": "Professional Lacrosse League (PLL)",
+      "category": "Sports league",
+      "zone": "unassigned",
+      "confidence": "signal_sourced",
+      "is_g7_client": false,
+      "sister_agency": false,
+      "adjacent": [],
+      "g7_notes": {
+        "relationship_notes": "New signal-sourced entity from FPO cultural scoring pass. Parent: Premier Lacrosse League, Inc."
+      },
+      "cultural_verticals": {
+        "music_performance": 1,
+        "sports": 5,
+        "gaming": 1,
+        "comedy": 1,
+        "festival": 1,
+        "talent_celebrity_partnerships": 3,
+        "college_marketing": 4,
+        "outdoor_adventure": 2,
+        "inter_brand_collaborations": 4,
+        "creator_influencer_partnerships": 2,
+        "wellness_fitness": 2,
+        "film_tv": 4,
+        "inclusion": 4
+      },
+      "cultural_verticals_source": "FPO sheet, user-provided 2026-07-11 — pending Film/TV vs Inclusion split resolution Inclusion score added 2026-07-11, user-provided (second batch).",
+      "business_verticals": {
+        "food_beverage": 1,
+        "automotive_transportation": 1,
+        "technology_b2b": 1,
+        "cpgs": 1,
+        "sports": 5,
+        "hospitality_travel_tourism": 1,
+        "beauty_retail": 1,
+        "media_social_platforms": 2,
+        "entertainment": 4
+      },
+      "business_verticals_source": "Claude first-pass draft, reviewed and corrected by user 2026-07-11 (added entertainment well; adjusted Rendezvous, White Claw, Liquid Death, Reddit, PLL entertainment scores). Business verticals list expanded from 6 to 9 wells this session (added beauty_retail, media_social_platforms, entertainment) to accommodate signal-sourced entities (Ulta Beauty, Reddit) and the plan doc's own Liquid Death hybrid-brand example (Part II, II.1)."
     }
   ],
   "corporate_parents": [
@@ -721,6 +1300,17 @@
       "note": "G7 works with Mojo Energy, a Swisher child brand. Swisher has a variety of other children not yet detailed.",
       "confidence": "user_provided",
       "flag": "Swisher's other child brands are not yet identified — worth a follow-up pass once there's time, similar to how the MABI family was expanded above."
+    },
+    {
+      "id": "jackson_hole_mountain_resort",
+      "name": "Jackson Hole Mountain Resort (JHMR)",
+      "children_existing_hub_nodes": [
+        "rendezvous_music_festival"
+      ],
+      "children_not_yet_hub_nodes": [],
+      "note": "G7 runs the Rendezvous Music Festival for JHMR end-to-end (Experiential + Talent Booking). JHMR is the parent/hosting resort; the festival itself is the actual G7 client program and the scored hub node.",
+      "confidence": "user_provided",
+      "flag": null
     }
   ],
   "structural_analogs": [

@@ -1,13 +1,14 @@
-/* §5c stellar cartography: dark canvas, luminous accents. */
+/* II.3 stellar cartography: black canvas, white/gray glow model, per-map
+   accent for interaction feedback (set on :root by app.js). */
 :root {
   --g7-purple: #3a1d6e;
   --g7-purple-light: #e8e0f7;
-  --floor-gray: #3d3a4c;
+  --floor-gray: #2c2a38;
   --ring-signal: #2fd4b8; /* unified: Signal Stacks detection OR RFP event */
-  --ring-sister: #f2d24b; /* §5a.1 Project Worldwide sister agency */
+  --ring-sister: #b83a1a; /* II.3 resolved: G7 red (was placeholder yellow) */
   --hull: #8b7dd8;
-  --analog-gold: #e8c15a;
-  --bg: #0d0b1a;
+  --map-accent: #9a6cd3; /* business purple; app.js swaps to #ffd22e on Cultural */
+  --bg: #050508;
   --panel-bg: #16132a;
   --text: #e2ddf2;
   --muted: #9a92b8;
@@ -117,23 +118,32 @@ body { display: flex; flex-direction: column; }
   stroke-dasharray: 6 6;
 }
 
+/* Structural-analog highlight is part of selection (§4h) — map accent. */
 .analog-link {
-  stroke: var(--analog-gold);
+  stroke: var(--map-accent);
   stroke-width: 2px;
   stroke-dasharray: 7 5;
   fill: none;
 }
 
 .node { cursor: pointer; }
-.node circle.core { stroke: rgba(226, 221, 242, 0.3); stroke-width: 1px; }
-/* §5c: glowing points replace the §5b flat drop shadow — parents + owned
-   clients only; adjacent/floor nodes stay flat, keeping the §5a split. */
-.node circle.core.elevated {
-  filter: drop-shadow(0 0 5px rgba(168, 134, 255, 0.9))
-    drop-shadow(0 0 14px rgba(122, 88, 199, 0.5));
+.node circle.core { stroke: rgba(226, 221, 242, 0.22); stroke-width: 1px; }
+/* II.3 base glow model — fills/glow intensities are applied per-node by
+   applyGlow() in app.js (signal-age and well-isolation scaling need inline
+   values); these classes carry the constant parts. */
+.node circle.core.glow-client {
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.85))
+    drop-shadow(0 0 16px rgba(235, 235, 255, 0.4));
 }
-.node.selected circle.core { stroke: #ffffff; stroke-width: 2.5px; }
-.node.analog-partner circle.core { stroke: var(--analog-gold); stroke-width: 3px; }
+.node circle.core.glow-floor { opacity: 0.55; }
+/* II.3 selection accent: the map's identity color lives in interaction
+   feedback, not the base palette. */
+.node.selected circle.core {
+  stroke: var(--map-accent);
+  stroke-width: 2.5px;
+  filter: drop-shadow(0 0 7px var(--map-accent)) !important;
+}
+.node.analog-partner circle.core { stroke: var(--map-accent); stroke-width: 3px; }
 
 .ring { fill: none; stroke-width: 2.5px; }
 .ring.signal { stroke: var(--ring-signal); }
@@ -143,12 +153,12 @@ body { display: flex; flex-direction: column; }
    old red new-addition ring entirely. */
 @keyframes new-pulse {
   0%, 100% {
-    filter: drop-shadow(0 0 5px rgba(214, 191, 255, 0.75))
-      drop-shadow(0 0 12px rgba(150, 110, 230, 0.45));
+    filter: drop-shadow(0 0 5px rgba(235, 235, 250, 0.7))
+      drop-shadow(0 0 12px rgba(215, 215, 240, 0.4));
   }
   50% {
-    filter: drop-shadow(0 0 9px rgba(230, 214, 255, 1))
-      drop-shadow(0 0 24px rgba(168, 134, 255, 0.85));
+    filter: drop-shadow(0 0 9px rgba(255, 255, 255, 1))
+      drop-shadow(0 0 24px rgba(240, 240, 255, 0.8));
   }
 }
 .node circle.core.new-pulse { animation: new-pulse 2.6s ease-in-out infinite; }
@@ -189,10 +199,47 @@ body { display: flex; flex-direction: column; }
 .has-selection .link:not(.connected):not(.dimmed) { opacity: 0.12; }
 .has-selection .node:not(.selected):not(.neighbor):not(.analog-partner):not(.dimmed) { opacity: 0.3; }
 .link.connected {
-  stroke: #b9a7f0;
+  stroke: var(--map-accent); /* II.3: selection feedback carries the map's color */
   stroke-width: 2px;
   opacity: 1;
 }
+
+/* ---- II.3 gravity-well isolation rail (Cultural Landscape only) ---- */
+
+#well-rail {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  max-width: 80%;
+  background: rgba(22, 19, 42, 0.9);
+  border: 1px solid rgba(139, 125, 216, 0.25);
+  border-radius: 10px;
+  padding: 8px 10px;
+  z-index: 5;
+}
+#well-rail.hidden { display: none; }
+#well-rail button {
+  border: 1px solid rgba(255, 210, 46, 0.25);
+  border-radius: 7px;
+  background: rgba(255, 210, 46, 0.07);
+  color: #d8cfa8;
+  font-size: 11px;
+  padding: 4px 9px;
+  cursor: pointer;
+}
+#well-rail button:hover { background: rgba(255, 210, 46, 0.18); }
+#well-rail button.active {
+  background: #ffd22e;
+  color: #221c04;
+  font-weight: 700;
+  border-color: #ffd22e;
+}
+#well-rail button.well-clear { border-style: dashed; color: var(--muted); }
 
 /* ---- panel ---- */
 
@@ -291,8 +338,8 @@ body { display: flex; flex-direction: column; }
 }
 .legend-row { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
 .swatch { width: 14px; height: 14px; border-radius: 50%; flex: 0 0 auto; }
-.swatch.gradient { background: linear-gradient(90deg, #3c3357, #b79aff); border-radius: 4px; }
-.swatch.client { background: linear-gradient(90deg, #6a48b8, #d4bfff); }
+.swatch.gradient { background: linear-gradient(90deg, rgba(150, 150, 165, 0.15), #b9b9cc); border-radius: 4px; }
+.swatch.client { background: #f5f3ff; box-shadow: 0 0 7px rgba(255, 255, 255, 0.8); }
 .swatch.floor { background: var(--floor-gray); }
 .swatch.ring { background: #fff; border: 2.5px solid; }
 .swatch.ring-signal { border-color: var(--ring-signal); }

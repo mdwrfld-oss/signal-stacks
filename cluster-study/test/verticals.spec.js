@@ -7,15 +7,29 @@ import {
   normalizeScores,
   weightedPosition,
   centroid,
-  stubVerticalScores,
 } from '../public/verticals.js';
 
-describe('taxonomies (II.10 — provisional)', () => {
-  it('has 6 business verticals and the 12 enumerated cultural verticals', () => {
-    expect(BUSINESS_VERTICALS.length).toBe(6);
-    // Plan says "11" but enumerates 12 — implementing the enumeration (flagged).
-    expect(CULTURAL_VERTICALS.length).toBe(12);
-    expect(CULTURAL_VERTICALS.map((v) => v.id)).toContain('inter_brand_collaborations');
+describe('taxonomies (final scored-data schema)', () => {
+  it('has 9 business wells and 13 cultural wells matching the seed keys exactly', () => {
+    expect(BUSINESS_VERTICALS.length).toBe(9);
+    expect(CULTURAL_VERTICALS.length).toBe(13);
+    const bizIds = BUSINESS_VERTICALS.map((v) => v.id);
+    for (const id of ['beauty_retail', 'media_social_platforms', 'entertainment']) {
+      expect(bizIds).toContain(id);
+    }
+    const cultIds = CULTURAL_VERTICALS.map((v) => v.id);
+    expect(cultIds).toContain('film_tv');
+    expect(cultIds).toContain('inclusion'); // film_tv_inclusion split in two
+    expect(cultIds).not.toContain('film_tv_inclusion');
+  });
+
+  it('taxonomy keys cover every key the seed actually uses (and vice versa)', () => {
+    const bizIds = new Set(BUSINESS_VERTICALS.map((v) => v.id));
+    const cultIds = new Set(CULTURAL_VERTICALS.map((v) => v.id));
+    for (const hub of seed.hub_nodes) {
+      expect(Object.keys(hub.business_verticals).sort()).toEqual([...bizIds].sort());
+      expect(Object.keys(hub.cultural_verticals).sort()).toEqual([...cultIds].sort());
+    }
   });
 });
 
@@ -70,45 +84,25 @@ describe('centroid (II.4 parent position rule)', () => {
   });
 });
 
-describe('stub scoring + graph integration (phase-1 placeholder)', () => {
+describe('graph integration (final scored data)', () => {
   const graph = buildGraphFromSeed(seed);
 
-  it('every hub gets both scored objects, dominant business vertical at 5', () => {
+  it('all 19 hubs carry both complete scored objects; the legacy vertical field is gone', () => {
     const hubs = graph.nodes.filter((n) => n.type === 'hub');
-    expect(hubs.length).toBe(15);
+    expect(hubs.length).toBe(19);
     for (const h of hubs) {
-      expect(h.business_verticals[h.vertical]).toBe(5);
-      expect(typeof h.cultural_verticals).toBe('object');
+      expect(Object.keys(h.business_verticals).length).toBe(9);
+      expect(Object.keys(h.cultural_verticals).length).toBe(13);
+      expect(h.vertical).toBeUndefined();
     }
   });
 
-  it('derived secondaries spread hubs off the pure single-anchor stub', () => {
-    const jh = graph.nodes.find((n) => n.id === 'jackson_hole');
-    expect(jh.cultural_verticals.festival).toBe(5);
-    expect(jh.business_verticals.sports).toBe(2); // secondary alongside dominant 5
-  });
-
-  it('seed-supplied scored fields would take precedence over the stub', () => {
-    const scored = stubVerticalScores({
-      id: 'white_claw',
-      vertical: 'food_beverage',
-    });
-    expect(scored.business_verticals.food_beverage).toBe(5);
-    // graph.js only calls the stub when the seed lacks the field:
-    const fake = {
-      hub_nodes: [
-        {
-          id: 'x',
-          name: 'X',
-          vertical: 'sports',
-          business_verticals: { cpgs: 4 },
-          cultural_verticals: { gaming: 2 },
-        },
-      ],
-    };
-    const g = buildGraphFromSeed(fake);
-    expect(g.nodes[0].business_verticals).toEqual({ cpgs: 4 });
-    expect(g.nodes[0].cultural_verticals).toEqual({ gaming: 2 });
+  it('carries the real scoring (Ulta inclusion 5; Rendezvous now fully scored)', () => {
+    const ulta = graph.nodes.find((n) => n.id === 'ulta_beauty');
+    expect(ulta.cultural_verticals.inclusion).toBe(5);
+    const rmf = graph.nodes.find((n) => n.id === 'rendezvous_music_festival');
+    expect(rmf.cultural_verticals.music_performance).toBeGreaterThan(0);
+    expect(rmf.parent).toBe('jackson_hole_mountain_resort');
   });
 
   it('non-hub nodes carry no scored objects (positioned relationally)', () => {
