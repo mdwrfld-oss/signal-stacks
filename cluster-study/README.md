@@ -28,20 +28,17 @@ Google Sheet (private, Service Account)          Seed JSON (bundled fallback)
   vertical sectors (Food & Beverage, Automotive & Transportation, Technology &
   B2B, CPGs, Sports, Hospitality/Travel/Tourism) as faint grid regions each
   pulling its member nodes' settle positions — cross-sector edges render as long
-  "trade routes" without dragging nodes out of their vertical;
+  "trade routes";
   anchored force layout with lens dimming (§4) plus §4g signals-only and
   competitor-dim toggles (all filters compose multiplicatively; competitor-dim
   hides adjacent labels outright), §5d label hierarchy (adjacent labels
-  permanently subordinate to the G7 roster), fluid drag
-  with snap-to-grid-and-stay on release (§4c — nearest unoccupied cell, persisted
-  per-browser; "Reset layout" clears), always-on label bounding-box collision (§4d),
-  pan/zoom + reset (§4a), ring/fill/floor grammar with the G7-client purple base
-  (§5/§5a), drop shadows on parents + owned clients only (§5b), orbital
-  parent/child families with per-family exclusion zones that keep non-family
-  nodes outside the ring (§6a/§6a.1a), hop-capped signal propagation (§6a.3),
-  selection-triggered structural-analog highlight (§6a.7), click-through detail
-  panel, search. Pure layout math (grid snapping, orbit slots) lives in
-  `public/layout.js`, unit-tested from the Worker suite.
+  permanently subordinate to the G7 roster). **Positions are fixed** (Plan
+  §II.5) — computed entirely from each entity's weighted vertical scores
+  (§II.1/§II.2), no dragging; pan/zoom + reset (§4a) is the only camera
+  interaction. Corporate families render as concentric rings, one per child
+  at its true distance from the shared centroid (§II.4), hop-capped signal
+  propagation (§6a.3), selection-triggered structural-analog highlight
+  (§6a.7), click-through detail panel, search.
 - **Scoring math** is shared: `public/scoring.js` is imported by the Worker bundle
   *and* the browser, so relevance/propagation are computed identically everywhere.
 
@@ -158,7 +155,7 @@ Bundles the frontend into ONE self-contained HTML file that opens directly
 from disk (double-click; `file://` works) — D3, styles, all JS, and the graph
 JSON inlined (pulled from the live `/data` when reachable, else the bundled
 seed). No dev server, no network, no Worker. View-only: the RFP pipeline and
-Sheet ingestion stay in the Worker. Drag/snap persistence still works.
+Sheet ingestion stay in the Worker.
 Re-run the script whenever the data or frontend changes; the export is a
 snapshot, not a live view.
 
@@ -175,17 +172,8 @@ KV namespace `CLUSTER_KV` (`366abe6c402243878e7b1d3b03d4a446`) is bound in
 
 - `half_life_days` (42) in `public/scoring.js` — decay half-life, to be tuned
   against real data (open question #12).
-- `GRID_SPACING` (72) in `public/layout.js` — the §4c invisible positioning grid.
-- `orbitRadius()` in `public/layout.js` — §6a.1 orbit sizing (min 90; grows with
-  child count via chord spacing and with parent/child label widths).
-- `ANCHOR_STRENGTH` (0.22) in `public/app.js` — pull toward default positions for
-  free nodes. Orbit children and user-placed nodes are pinned instead.
-- Drag semantics (§4b + §4c, resolved with the user): released nodes snap to the
-  nearest free grid cell and STAY, persisted in the browser's localStorage —
-  return-to-home was superseded for manual drags. Dragging a parent moves its
-  whole orbit formation; individually placed children opt out of the formation.
-- Idle drift at rest (§4b) — not implemented; decide once the drag mechanic can
-  be felt.
+- `ANCHOR_STRENGTH` (0.22) in `public/app.js` — pull toward each entity's
+  fixed, score-computed position (§II.5 — positions are not draggable).
 - Ring for inherited (proximity) signals — open question #13; currently rings are
   reserved for direct signals, propagation shows as fill only.
 - Talent click-through history (§10.4) — placeholder in the panel, gated on the

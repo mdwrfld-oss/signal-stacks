@@ -1,11 +1,11 @@
 /**
  * G7 Cluster Study — NBD hub-and-spoke view.
  *
- * Layout model (Plan Section 4): anchored default positions. One deterministic
- * force settle on load decides where everything lives; a gentle anchor force
- * pulls each node back to that home position after any drag (Section 4b,
- * Obsidian-style). Lens switching changes visibility treatment only —
- * dim/desaturate, never reposition — so spatial memory holds.
+ * Layout model (Plan Section II.2/II.5): positions are fixed, computed
+ * entirely from each entity's weighted vertical scores — no dragging.
+ * Pan/zoom (Section 4a) is the only camera interaction. Lens switching
+ * changes visibility treatment only — dim/desaturate, never reposition — so
+ * spatial memory holds.
  *
  * Visual grammar (Section 5): ring = active signal exists; fill darkness =
  * relevance (purple gradient); static gray = floor state (no signal ever).
@@ -23,7 +23,6 @@ import {
   ringsFor,
   isNewAddition,
 } from '/scoring.js';
-import { nearestFreeCell, cellOf, cellKey } from '/layout.js';
 import {
   BUSINESS_VERTICALS,
   CULTURAL_VERTICALS,
@@ -363,12 +362,13 @@ function render(graph) {
     const relax = forceLabelCollide(true);
     relax.initialize(graph.nodes);
     for (let i = 0; i < 420; i++) relax();
-    // Family ring radius per map = mean child distance from the centroid —
-    // a rendering stopgap until II.4's concentric rings.
+    // II.4: one ring radius PER CHILD (that child's true distance from the
+    // centroid), not a single mean — array length is constant (= children
+    // count) across both maps, so the fly-toggle can interpolate index-wise.
     for (const fam of families) {
       const p = pos.get(fam.parent.id);
       fam.ring = fam.ring || {};
-      fam.ring[mapId] = p ? d3.mean(fam.children, (ch) => Math.hypot(ch.x - p.x, ch.y - p.y)) : 0;
+      fam.ring[mapId] = p ? fam.children.map((ch) => Math.hypot(ch.x - p.x, ch.y - p.y)) : [];
     }
     const snapshot = new Map();
     for (const n of graph.nodes) snapshot.set(n.id, { x: n.x, y: n.y, pinned: pos.has(n.id) });
@@ -403,24 +403,21 @@ function render(graph) {
   }
   applyMap('business');
 
-  // §4c persistence carried over this phase (II.5 retires dragging later):
-  // a saved placement pins the node identically in BOTH maps — it won't fly
-  // on toggle until "Reset layout".
-  const saved = loadSavedLayout();
-  for (const n of graph.nodes) {
-    if (Array.isArray(saved[n.id])) {
-      n.homeX = n.x = n.fx = saved[n.id][0];
-      n.homeY = n.y = n.fy = saved[n.id][1];
-    }
-  }
-
-  /* dashed family rings at per-map mean child distance (II.4 stopgap) */
-  const orbits = hullLayer
-    .selectAll('circle')
+  /* II.4 concentric family rings: one dashed ring per child, at that child's
+     true independently-computed distance from the shared centroid — a
+     rendering aid, not a layout mechanism. Grouped per family so every
+     child's ring moves with the parent in one transform. */
+  const orbitGroup = hullLayer
+    .selectAll('g.orbit-family')
     .data(families)
+    .join('g')
+    .attr('class', 'orbit-family');
+  const orbitRings = orbitGroup
+    .selectAll('circle')
+    .data((f) => [...f.ring[state.map]].sort((a, b) => b - a).map((r) => ({ r })))
     .join('circle')
     .attr('class', 'orbit-path')
-    .attr('r', (d) => d.ring[state.map] || 0);
+    .attr('r', (d) => d.r);
 
   /* links */
   const link = linkLayer
@@ -435,7 +432,6 @@ function render(graph) {
     .data(graph.nodes)
     .join('g')
     .attr('class', 'node')
-    .call(dragBehavior(simulation, graph.nodes, families))
     .on('click', (event, d) => {
       event.stopPropagation();
       selectNode(d);
@@ -601,9 +597,12 @@ function render(graph) {
     );
     applyMapChrome(mapId);
     const targets = mapPositions[mapId];
-    const savedNow = loadSavedLayout();
     const starts = new Map(graph.nodes.map((n) => [n.id, { x: n.x, y: n.y }]));
-    const ringStarts = new Map(families.map((f) => [f, f.renderRing ?? f.ring[mapId === 'business' ? 'cultural' : 'business']]));
+    // II.4: ring arrays are index-aligned per child across both maps, so a
+    // family's rings interpolate the same way node x/y do — no rebinding.
+    const ringStarts = new Map(
+      families.map((f) => [f, f.renderRing ?? f.ring[mapId === 'business' ? 'cultural' : 'business']])
+    );
 
     d3.select({})
       .transition()
@@ -611,7 +610,6 @@ function render(graph) {
       .ease(d3.easeCubicInOut)
       .tween('fly', () => (t) => {
         for (const n of graph.nodes) {
-          if (Array.isArray(savedNow[n.id])) continue; // user-pinned: stays put
           const s = starts.get(n.id);
           const p = targets.get(n.id);
           n.x = s.x + (p.x - s.x) * t;
@@ -622,15 +620,21 @@ function render(graph) {
           }
         }
         for (const f of families) {
-          const from = ringStarts.get(f) || 0;
-          f.renderRing = from + ((f.ring[mapId] || 0) - from) * t;
+          const from = ringStarts.get(f) || [];
+          f.renderRing = f.ring[mapId].map((target, i) => {
+            const start = from[i] ?? target;
+            return start + (target - start) * t;
+          });
         }
-        orbits.attr('r', (f) => f.renderRing || 0);
+        // Count per family never changes (= children.length, both maps), so
+        // this is a plain positional update — no enter/exit needed.
+        orbitRings
+          .data((f) => [...f.renderRing].sort((a, b) => b - a).map((r) => ({ r })))
+          .attr('r', (d) => d.r);
         ticked();
       })
       .on('end', () => {
         for (const n of graph.nodes) {
-          if (Array.isArray(savedNow[n.id])) continue;
           const p = targets.get(n.id);
           n.homeX = n.x = p.x;
           n.homeY = n.y = p.y;
@@ -651,13 +655,9 @@ function render(graph) {
   document.querySelectorAll('#map-toggle button').forEach((btn) => {
     btn.addEventListener('click', () => switchMap(btn.dataset.map));
   });
-  document.getElementById('reset-layout').addEventListener('click', () => {
-    localStorage.removeItem(LAYOUT_KEY);
-    location.reload();
-  });
   svg.call(zoom.transform, fitTransform());
 
-  /* tick — also runs during drags so hulls and links track live (4b) */
+  /* tick */
   function ticked() {
     node.attr('transform', (d) => `translate(${d.x},${d.y})`);
     link
@@ -665,7 +665,7 @@ function render(graph) {
       .attr('y1', (d) => d.source.y)
       .attr('x2', (d) => d.target.x)
       .attr('y2', (d) => d.target.y);
-    orbits.attr('cx', (d) => d.parent.x).attr('cy', (d) => d.parent.y);
+    orbitGroup.attr('transform', (d) => `translate(${d.parent.x},${d.parent.y})`);
     updateAnalogLines();
   }
   simulation.on('tick', ticked);
@@ -697,7 +697,7 @@ function render(graph) {
   function applyFilters() {
     node.classed('dimmed', (d) => !passes(d));
     link.classed('dimmed', (d) => !passes(d.source) || !passes(d.target));
-    orbits.classed('dimmed', (d) => ![d.parent, ...d.children].some((m) => passes(m)));
+    orbitGroup.classed('dimmed', (d) => ![d.parent, ...d.children].some((m) => passes(m)));
     // Competitor-dim hides adjacent labels entirely (§4g: decluttered view,
     // not a partial one) — the circles dim, the labels go away.
     viewport.classed('competitors-hidden', state.dimCompetitors);
@@ -887,110 +887,6 @@ function forceLabelCollide(movePinned = false) {
 
   force.initialize = (n) => (nodes = n);
   return force;
-}
-
-/* ------------------------------------------------- drag (4b) + snap (4c) */
-
-const LAYOUT_KEY = 'cluster_layout_v1';
-
-function loadSavedLayout() {
-  try {
-    return JSON.parse(localStorage.getItem(LAYOUT_KEY)) || {};
-  } catch {
-    return {};
-  }
-}
-
-function saveNodePosition(id, x, y) {
-  const all = loadSavedLayout();
-  all[id] = [Math.round(x * 10) / 10, Math.round(y * 10) / 10];
-  localStorage.setItem(LAYOUT_KEY, JSON.stringify(all));
-}
-
-function dragBehavior(simulation, nodes, families) {
-  // Dragging stays fluid (4b: neighbors respond through the live forces). On
-  // release the node snaps to the nearest UNOCCUPIED grid cell and stays —
-  // desktop-icon repositioning (§4c). The anchor force is what walks it onto
-  // the cell, so the snap animates instead of teleporting.
-  return d3
-    .drag()
-    .on('start', (event, d) => {
-      if (!event.active) simulation.alphaTarget(0.25).restart();
-      d.fx = d.x;
-      d.fy = d.y;
-    })
-    .on('drag', (event, d) => {
-      d.fx = event.x;
-      d.fy = event.y;
-    })
-    .on('end', (event, d) => {
-      if (!event.active) simulation.alphaTarget(0);
-
-      // Placed nodes stay pinned — link tension must not drag them off their
-      // spot. Short tween so every release animates rather than teleporting.
-      const glidePin = (target) => {
-        const from = { x: event.x, y: event.y };
-        d3.select({}).transition().duration(220).ease(d3.easeCubicOut).tween('snap', () => (t) => {
-          d.fx = from.x + (target.x - from.x) * t;
-          d.fy = from.y + (target.y - from.y) * t;
-        });
-      };
-
-      const childFam = d.orbital ? families.find((f) => f.children.includes(d)) : null;
-      if (childFam) {
-        // §6a.1b orbit-locked release: a child dragged around (or away from)
-        // its parent projects onto the orbit circle at the DROP angle —
-        // radius normalized, NOT returned to its original slot. Lets users
-        // reorder a crowded ring (MABI) without a child ever drifting off it.
-        const p = childFam.parent;
-        const angle = Math.atan2(event.y - p.y, event.x - p.x);
-        const target = {
-          x: p.x + childFam.radius * Math.cos(angle),
-          y: p.y + childFam.radius * Math.sin(angle),
-        };
-        d.homeX = target.x;
-        d.homeY = target.y;
-        saveNodePosition(d.id, target.x, target.y); // reloaded as an angle (§6a.1b)
-        glidePin(target);
-      } else {
-        // §4c grid snap for parents and free nodes. Occupancy: every other
-        // node's home claims its containing cell, so two nodes can never
-        // land on the same spot.
-        const occupied = new Set();
-        for (const n of nodes) {
-          if (n !== d) occupied.add(cellKey(...cellOf(n.homeX, n.homeY)));
-        }
-        const cell = nearestFreeCell(event.x, event.y, occupied);
-        const dx = cell.x - d.homeX;
-        const dy = cell.y - d.homeY;
-        d.homeX = cell.x;
-        d.homeY = cell.y;
-        saveNodePosition(d.id, cell.x, cell.y);
-        glidePin(cell);
-        if (d.type === 'parent') {
-          // The whole orbit moves with its parent — INCLUDING user-placed
-          // children, since their ring is defined by the parent (§6a.1b).
-          const fam = families.find((f) => f.parent === d);
-          for (const child of fam?.children || []) {
-            child.homeX += dx;
-            child.homeY += dy;
-            const from = { x: child.x, y: child.y };
-            const to = { x: child.homeX, y: child.homeY };
-            d3.select({}).transition().duration(300).ease(d3.easeCubicOut).tween('follow', () => (t) => {
-              child.x = child.fx = from.x + (to.x - from.x) * t;
-              child.y = child.fy = from.y + (to.y - from.y) * t;
-              child.vx = 0;
-              child.vy = 0;
-            });
-          }
-        }
-      }
-      // d3.forceX/Y cache their target accessor at initialization — homes
-      // just changed, so re-point the anchors or they pull at stale spots.
-      simulation.force('x').x((n) => n.homeX);
-      simulation.force('y').y((n) => n.homeY);
-      simulation.alpha(0.35).restart();
-    });
 }
 
 /* -------------------------------------------------------------- families */
