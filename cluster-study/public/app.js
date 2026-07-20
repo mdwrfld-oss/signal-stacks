@@ -22,7 +22,9 @@ import {
   computeEffectiveRelevance,
   ringsFor,
   isNewAddition,
+  arrowDecayLevel,
 } from '/scoring.js';
+import { computeGravity } from '/gravity.js';
 import {
   BUSINESS_VERTICALS,
   CULTURAL_VERTICALS,
@@ -59,9 +61,24 @@ const MAP_TRANSITION_MS = 1100;
 // Business wells: 3×3 grid of anchor points (9 verticals).
 const BIZ_COL_STEP = 720;
 const BIZ_ROW_STEP = 620;
-// Cultural wells: 12 anchor points on an ellipse.
+// Cultural wells: 13 anchor points on an ellipse.
 const CULT_RX = 900;
 const CULT_RY = 640;
+// Cultural spacing: raw proportional weights collapse everyone toward the
+// ellipse centroid (every entity carries some score in most of the 13 wells).
+// Sharpening the weights (score^gamma before normalizing) makes a 5 pull
+// disproportionately harder than a 3, so small score differences become
+// visually distinct positions. Presentation-only — panel still shows raw 0–5.
+// Tuned by measurement: gamma 1 packed every entity within 24% of the well
+// radius (mean pairwise 135px); 2.6 spreads to 70% reach / 299px mean while
+// staying inside the label ring (0.8). gamma 3 collides with the labels.
+const CULT_SCORE_GAMMA = 2.6;
+// Well labels render at this fraction of the anchor radius — same bearing as
+// the true (invisible) anchor, pulled inward so the fitted view stays tight.
+const WELL_LABEL_RADIUS = 0.8;
+// II.6 signal vectors: arrow length steps down per 4-week decay level (0–5).
+const VECTOR_BASE_LEN = 92;
+const VECTOR_LEN_STEP = 12;
 
 const state = {
   graph: null,
@@ -125,6 +142,25 @@ function prepare(graph) {
   state.nodesById = new Map(graph.nodes.map((n) => [n.id, n]));
   state.analogPairs = graph.structural_analogs || [];
 
+  // II.7 G7 Gravity inputs: which nodes sit in a corporate family containing
+  // a G7 client (relationship-access factor), and which appear in a
+  // structural-analog pair (lookalike factor).
+  state.analogIds = new Set(state.analogPairs.flatMap((p) => [p.a, p.b]));
+  state.clientFamilyIds = new Set();
+  const byParent = new Map();
+  for (const n of graph.nodes) {
+    if (!n.parent) continue;
+    if (!byParent.has(n.parent)) byParent.set(n.parent, []);
+    byParent.get(n.parent).push(n);
+  }
+  for (const [parentId, children] of byParent) {
+    const parent = state.nodesById.get(parentId);
+    const members = parent ? [parent, ...children] : children;
+    if (members.some((m) => m.is_g7_client)) {
+      for (const m of members) state.clientFamilyIds.add(m.id);
+    }
+  }
+
   // Label metrics via canvas so collision boxes exist before the settle runs
   // (DOM text can't be measured yet, and hidden labels measure as 0).
   const measureCtx = document.createElement('canvas').getContext('2d');
@@ -181,7 +217,9 @@ function prepare(graph) {
     }
     n.weights = {
       business,
-      cultural: normalizeScores(n.cultural_verticals, CULTURAL_VERTICALS),
+      // Gamma-sharpened for spacing (see CULT_SCORE_GAMMA) — dominant wells
+      // dominate position, so near-tied profiles stop stacking at the center.
+      cultural: normalizeScores(n.cultural_verticals, CULTURAL_VERTICALS, CULT_SCORE_GAMMA),
     };
   }
 }
@@ -202,11 +240,14 @@ function inLens(node, lens) {
 
 function injectDemoSignals(graph) {
   const daysAgo = (d) => new Date(Date.now() - d * 86400000).toISOString().split('T')[0];
+  // cultural_wells drive II.6 arrows — dates staggered so demo mode shows
+  // several decay levels at once (5d → level 0, 70d → level 2, 150d → level 5).
   const demo = {
-    white_claw: { strength: 0.95, date: daysAgo(5), type: 'signal_stacks' },
-    mikes_hard_lemonade: { strength: 0.9, date: daysAgo(2), type: 'signal_stacks' },
-    subaru: { strength: 0.85, date: daysAgo(20), type: 'rfp' },
-    liquid_death: { strength: 0.6, date: daysAgo(70), type: 'signal_stacks' },
+    white_claw: { strength: 0.95, date: daysAgo(5), type: 'signal_stacks', cultural_wells: ['music_performance'] },
+    mikes_hard_lemonade: { strength: 0.9, date: daysAgo(2), type: 'signal_stacks', cultural_wells: ['festival'] },
+    subaru: { strength: 0.85, date: daysAgo(20), type: 'rfp', cultural_wells: ['outdoor_adventure'] },
+    liquid_death: { strength: 0.6, date: daysAgo(70), type: 'signal_stacks', cultural_wells: ['comedy', 'gaming'] },
+    workday: { strength: 0.5, date: daysAgo(150), type: 'signal_stacks', cultural_wells: ['sports'] },
   };
   for (const n of graph.nodes) {
     if (demo[n.id]) n.signal = demo[n.id];
@@ -238,13 +279,16 @@ function render(graph) {
   }
 
   const viewport = svg.append('g').attr('id', 'viewport').attr('class', 'zoomed-out');
+  const wellLabelLayer = viewport.append('g').attr('class', 'well-label-layer');
   const hullLayer = viewport.append('g');
   const linkLayer = viewport.append('g');
+  const vectorLayer = viewport.append('g').attr('class', 'vector-layer');
   const analogLayer = viewport.append('g');
   const nodeLayer = viewport.append('g');
 
-  /* II.2 invisible well anchors — attractors the position math pulls toward,
-     NOT rendered regions (well illumination is later-phase work, II.3). */
+  /* II.2 well anchors — attractors the position math pulls toward. Business
+     anchors stay invisible; cultural anchors get faint cartographic labels
+     (below) so placement on that map reads as meaning, not decoration. */
   const cx = width / 2;
   const cy = height / 2;
   const businessAnchors = new Map(
@@ -260,6 +304,38 @@ function render(graph) {
     })
   );
   const anchorsFor = (mapId) => (mapId === 'business' ? businessAnchors : culturalAnchors);
+
+  /* Cultural well labels: same bearing as the true anchor, pulled inward to
+     WELL_LABEL_RADIUS so the fitted view stays tight. Visible only on the
+     Cultural Landscape (CSS-gated via #canvas.cultural-active). */
+  const wellLabelPoints = CULTURAL_VERTICALS.map((v) => {
+    const a = culturalAnchors.get(v.id);
+    return { id: v.id, label: v.label, x: cx + (a.x - cx) * WELL_LABEL_RADIUS, y: cy + (a.y - cy) * WELL_LABEL_RADIUS };
+  });
+  const wellLabels = wellLabelLayer
+    .selectAll('text')
+    .data(wellLabelPoints)
+    .join('text')
+    .attr('class', 'well-label')
+    .attr('text-anchor', 'middle')
+    .attr('x', (d) => d.x)
+    .attr('y', (d) => d.y)
+    .text((d) => d.label.toUpperCase());
+
+  /* II.6 arrowhead marker (cultural accent — vectors only render there). */
+  svg
+    .append('defs')
+    .append('marker')
+    .attr('id', 'vector-head')
+    .attr('viewBox', '0 0 10 10')
+    .attr('refX', 8)
+    .attr('refY', 5)
+    .attr('markerWidth', 7)
+    .attr('markerHeight', 7)
+    .attr('orient', 'auto-start-reverse')
+    .append('path')
+    .attr('d', 'M 0 0 L 10 5 L 0 10 z')
+    .attr('fill', '#ffd22e');
 
   // Structural analogs stay OUT of the layout links: not physical proximity,
   // not a persistent line (Section 6a.7).
@@ -426,6 +502,45 @@ function render(graph) {
     .join('line')
     .attr('class', (d) => `link ${d.relationship}`);
 
+  /* II.6 signal vectors: one arrow per (signal, evidenced cultural well),
+     pointing from the node toward that well's anchor — the signal's pull on
+     the entity's cultural identity, rendered BEFORE any score change so one
+     announcement can't overcorrect a stable position. Length and opacity
+     step down across the 6 monthly decay levels; expired (>24wk) signals
+     draw nothing. Wells come from signal.cultural_wells — provisionally
+     hand-tagged at ingest until the Cultural Affinity Processor owns
+     classification (II.11 / Part III). */
+  const now = Date.now();
+  const vectorData = [];
+  for (const n of graph.nodes) {
+    const level = arrowDecayLevel(n.signal, now);
+    if (level === null || !Array.isArray(n.signal.cultural_wells)) continue;
+    for (const well of n.signal.cultural_wells) {
+      if (culturalAnchors.has(well)) vectorData.push({ node: n, well, level });
+    }
+  }
+  const vector = vectorLayer
+    .selectAll('line')
+    .data(vectorData)
+    .join('line')
+    .attr('class', (d) => `signal-vector level-${d.level}`)
+    .attr('marker-end', 'url(#vector-head)')
+    .style('opacity', (d) => 0.9 - d.level * 0.14);
+
+  function updateVectors() {
+    vector.each(function (d) {
+      const a = culturalAnchors.get(d.well);
+      const angle = Math.atan2(a.y - d.node.y, a.x - d.node.x);
+      const start = d.node.r + RING_GAP * d.node.rings.length + 4;
+      const len = VECTOR_BASE_LEN - d.level * VECTOR_LEN_STEP;
+      d3.select(this)
+        .attr('x1', d.node.x + start * Math.cos(angle))
+        .attr('y1', d.node.y + start * Math.sin(angle))
+        .attr('x2', d.node.x + (start + len) * Math.cos(angle))
+        .attr('y2', d.node.y + (start + len) * Math.sin(angle));
+    });
+  }
+
   /* nodes */
   const node = nodeLayer
     .selectAll('g.node')
@@ -510,6 +625,7 @@ function render(graph) {
     rail.querySelectorAll('button[data-well]').forEach((b) =>
       b.classList.toggle('active', b.dataset.well === wellId)
     );
+    wellLabels.classed('active', (d) => d.id === wellId);
     applyGlow();
   }
   rail.addEventListener('click', (e) => {
@@ -519,9 +635,11 @@ function render(graph) {
     setIsolatedWell(b.dataset.well === state.isolatedWell ? null : b.dataset.well);
   });
 
-  /* II.3 map accent + rail visibility follow the active landscape. */
+  /* II.3 map accent + rail visibility follow the active landscape; well
+     labels and signal vectors are cultural-only (CSS fades on the class). */
   function applyMapChrome(mapId) {
     document.documentElement.style.setProperty('--map-accent', MAP_ACCENT[mapId]);
+    document.getElementById('canvas').classList.toggle('cultural-active', mapId === 'cultural');
     rail.classList.toggle('hidden', mapId !== 'cultural');
     if (mapId !== 'cultural' && state.isolatedWell) setIsolatedWell(null);
     else applyGlow();
@@ -569,8 +687,12 @@ function render(graph) {
   // landscapes have different footprints (grid vs ellipse), so fit follows
   // the map being shown.
   function fitTransform(mapId = state.map) {
-    const pad = 80;
+    // Cultural fit includes the well-label ring, so the labels that give
+    // placement its meaning are on screen by default (wider pad: the label
+    // text is anchored middle and extends past its point).
+    const pad = mapId === 'cultural' ? 130 : 80;
     const pts = [...mapPositions[mapId].values()];
+    if (mapId === 'cultural') pts.push(...wellLabelPoints);
     const xs = d3.extent(pts, (p) => p.x);
     const ys = d3.extent(pts, (p) => p.y);
     const dx = xs[1] - xs[0] + pad * 2;
@@ -666,6 +788,7 @@ function render(graph) {
       .attr('x2', (d) => d.target.x)
       .attr('y2', (d) => d.target.y);
     orbitGroup.attr('transform', (d) => `translate(${d.parent.x},${d.parent.y})`);
+    updateVectors();
     updateAnalogLines();
   }
   simulation.on('tick', ticked);
@@ -697,6 +820,7 @@ function render(graph) {
   function applyFilters() {
     node.classed('dimmed', (d) => !passes(d));
     link.classed('dimmed', (d) => !passes(d.source) || !passes(d.target));
+    vector.classed('dimmed', (d) => !passes(d.node));
     orbitGroup.classed('dimmed', (d) => ![d.parent, ...d.children].some((m) => passes(m)));
     // Competitor-dim hides adjacent labels entirely (§4g: decluttered view,
     // not a partial one) — the circles dim, the labels go away.
@@ -948,6 +1072,35 @@ function showPanel(d) {
     parts.push('</p>');
   }
 
+  /* II.7 G7 Gravity — first-draft formula, factor breakdown, proxy inputs
+     labeled as such. Skipped for pure competitor context nodes (adjacents
+     with no scoring and no signal) where every factor would be a default. */
+  if (d.type !== 'adjacent' || d.signal || d.cultural_verticals) {
+    const g = computeGravity(
+      d,
+      {
+        relevance: eff?.relevance || 0,
+        inClientFamily: state.clientFamilyIds.has(d.id),
+        hasAnalog: state.analogIds.has(d.id),
+      },
+      Date.now()
+    );
+    parts.push(`<h3>G7 Gravity — <strong>${g.score}</strong>/100 <span class="trend ${g.trend.dir}">${g.trend.dir === 'rising' ? '▲ rising' : '― stable'}</span></h3>`);
+    parts.push('<ul class="gravity-factors">');
+    for (const f of g.factors) {
+      parts.push(
+        `<li><span class="gf-points">${f.points.toFixed(1).replace(/\.0$/, '')}/${f.weight}</span> ${esc(f.label)}<br><span class="rel-note">${esc(f.basis)}</span></li>`
+      );
+    }
+    for (const p of g.penalties) {
+      parts.push(`<li class="gf-penalty"><span class="gf-points">−${p.points}</span> ${esc(p.label)}<br><span class="rel-note">${esc(p.basis)}</span></li>`);
+    }
+    parts.push('</ul>');
+    parts.push(
+      `<p class="rel-note">First-draft formula (II.7) — weights are a starting proposal, several inputs are labeled proxies until CAP and revenue data land. Trend: ${esc(g.trend.driver)}.</p>`
+    );
+  }
+
   /* II.1 vertical profiles — displayed as 0–5 (stored as normalized weights) */
   const profileSection = (title, scores, taxonomy) => {
     const rows = taxonomy
@@ -959,9 +1112,6 @@ function showPanel(d) {
   if (d.business_verticals || d.cultural_verticals) {
     profileSection('Business profile (0–5)', d.business_verticals, BUSINESS_VERTICALS);
     profileSection('Cultural profile (0–5)', d.cultural_verticals, CULTURAL_VERTICALS);
-    parts.push(
-      '<p class="rel-note">Provisional stub scoring (dominant vertical + rough derived secondaries) — real multi-vertical scoring is pending follow-up work.</p>'
-    );
   }
 
   /* notes */

@@ -52,6 +52,17 @@ describe('normalizeScores (II.1: 0–5 display → normalized weights)', () => {
     expect(normalizeScores({}, BUSINESS_VERTICALS)).toBeNull();
     expect(normalizeScores(null, BUSINESS_VERTICALS)).toBeNull();
   });
+
+  it('gamma > 1 sharpens weights toward the dominant well (spacing knob)', () => {
+    const flat = normalizeScores({ food_beverage: 5, sports: 3 }, BUSINESS_VERTICALS);
+    const sharp = normalizeScores({ food_beverage: 5, sports: 3 }, BUSINESS_VERTICALS, 2.2);
+    expect(sharp.food_beverage).toBeGreaterThan(flat.food_beverage);
+    expect(sharp.sports).toBeLessThan(flat.sports);
+    // Still a proper weight distribution.
+    expect(sharp.food_beverage + sharp.sports).toBeCloseTo(1, 9);
+    // gamma 1 (default) unchanged: plain proportional.
+    expect(flat.food_beverage).toBeCloseTo(5 / 8, 9);
+  });
 });
 
 describe('weightedPosition (II.2)', () => {

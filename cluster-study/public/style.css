@@ -118,6 +118,29 @@ body { display: flex; flex-direction: column; }
   stroke-dasharray: 6 6;
 }
 
+/* Cultural well labels + II.6 signal vectors: cultural-map-only chrome,
+   faded in/out by the cultural-active class applyMapChrome() sets. */
+.well-label-layer, .vector-layer {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.7s ease;
+}
+#canvas.cultural-active .well-label-layer,
+#canvas.cultural-active .vector-layer { opacity: 1; }
+.well-label {
+  fill: rgba(255, 210, 46, 0.38);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+}
+.well-label.active { fill: rgba(255, 210, 46, 0.95); }
+.signal-vector {
+  stroke: #ffd22e;
+  stroke-width: 2px;
+  stroke-linecap: round;
+}
+.signal-vector.dimmed { opacity: 0.06 !important; }
+
 /* Structural-analog highlight is part of selection (§4h) — map accent. */
 .analog-link {
   stroke: var(--map-accent);
@@ -322,6 +345,21 @@ body { display: flex; flex-direction: column; }
 }
 .relevance-bar > div { height: 100%; background: #a886ff; }
 
+/* II.7 G7 Gravity factor breakdown */
+.gravity-factors { list-style: none; padding-left: 0; margin: 6px 0; }
+.gravity-factors li { margin-bottom: 5px; font-size: 12px; }
+.gf-points {
+  display: inline-block;
+  min-width: 52px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--g7-purple-light);
+}
+.gf-penalty .gf-points { color: #e0685f; }
+.trend { font-size: 11px; font-weight: 600; margin-left: 6px; }
+.trend.rising { color: #2fd4b8; }
+.trend.stable { color: var(--muted); }
+
 /* ---- legend & status ---- */
 
 #legend {
@@ -349,6 +387,21 @@ body { display: flex; flex-direction: column; }
   animation: new-pulse 2.6s ease-in-out infinite;
 }
 .swatch.orbit { background: rgba(106, 76, 147, 0.06); border: 1.5px dashed var(--hull); }
+.swatch.vector {
+  border-radius: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #ffd22e 70%, transparent 70%);
+  position: relative;
+}
+.swatch.vector::after {
+  content: '';
+  position: absolute;
+  right: 1px;
+  top: -3px;
+  border-left: 6px solid #ffd22e;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+}
 
 #status {
   position: absolute;

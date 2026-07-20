@@ -24,6 +24,20 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import seed from '../G7_Cluster_Study_Seed_Data.json' with { type: 'json' };
 import { buildGraphFromSeed, slugify } from '../src/graph.js';
 
+/*
+ * II.6 PROVISIONAL cultural-well tags per signal, keyed by node id — which
+ * cultural wells each signal is evidence for, read straight off the CSV's
+ * summary/rationale text by a human. This classification is the Cultural
+ * Affinity Processor's job once it exists (Plan II.11 / Part III); these
+ * hand tags are a stand-in so signal vectors render against real signals.
+ */
+const PROVISIONAL_WELL_TAGS = {
+  reddit: ['festival'], // Cannes Lions branded deli experience
+  ulta_beauty: ['creator_influencer_partnerships'], // TikTok Shop, creator-driven strategy
+  stella_artois: ['sports', 'festival'], // World Cup pop-up bar
+  pll: ['talent_celebrity_partnerships'], // Glen Powell / Rob McElhenney partnerships
+};
+
 /* CSV Vertical → §4f sector (keyword heuristics; unknown → null). */
 const SECTOR_RULES = [
   [/beverage|beer|seltzer|spirits|wine|whiskey|food|snack/i, 'food_beverage'],
@@ -186,6 +200,7 @@ for (const m of matched) {
 for (const [nodeId, m] of byNode) {
   const node = graph.nodes.find((n) => n.id === nodeId);
   node.signal = m.signal;
+  if (PROVISIONAL_WELL_TAGS[nodeId]) node.signal.cultural_wells = PROVISIONAL_WELL_TAGS[nodeId];
 }
 
 // --create-unmatched: new-opportunity brands become new adjacent nodes with
@@ -221,6 +236,7 @@ if (createUnmatched) {
       date_added: (row.date_found || date || '').trim() || null,
       source: 'csv',
     };
+    if (PROVISIONAL_WELL_TAGS[node.id]) node.signal.cultural_wells = PROVISIONAL_WELL_TAGS[node.id];
     graph.nodes.push(node);
     created.push(node);
   }
@@ -254,7 +270,8 @@ const activated = byNode.size + created.length;
 if (outPath && activated > 0) {
   writeFileSync(outPath, JSON.stringify(graph));
   console.log(`\nGraph with ${activated} activated signals written to ${outPath}`);
-  console.log('Publish with: npx wrangler kv key put graph:data --path ' + outPath + ' --namespace-id 366abe6c402243878e7b1d3b03d4a446 --remote');
+  // v2 branch: cluster-study-v2-worker's namespace (v1 demo KV is 366abe6c…).
+  console.log('Publish with: npx wrangler kv key put graph:data --path ' + outPath + ' --namespace-id d9279c728d564684b782d8e45827a94a --remote');
 } else if (outPath) {
   console.log('\nNo confident matches — nothing written (KV left untouched).');
 }

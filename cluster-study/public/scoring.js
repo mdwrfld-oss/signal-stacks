@@ -139,3 +139,30 @@ export function isNewAddition(node, nowMs, config = DEFAULT_CONFIG) {
   const addedMs = Date.parse(node.date_added);
   return !Number.isNaN(addedMs) && (nowMs - addedMs) / MS_PER_DAY <= config.new_addition_days;
 }
+
+/* -------------------------------------------- II.6 signal-vector decay */
+
+// Resolved decay schedule (II.6): 4-week (monthly) increments across 6
+// levels — a 24-week total window. After that, a recurring similar signal is
+// a fresh, isolated one-off; it doesn't inherit the old arrow's momentum.
+export const ARROW_LEVEL_DAYS = 28;
+export const ARROW_MAX_LEVELS = 6;
+
+/**
+ * Decay level for a signal's directional arrow: 0 (fresh, brightest/longest)
+ * through 5 (last month of the window). Returns null once the 24-week window
+ * has passed, for missing/invalid dates, and for future-dated signals'
+ * clock-skew guard (negative ages clamp to level 0).
+ *
+ * The step SHAPE is linear (equal 4-week treads) — the plan flags
+ * front/back-loaded curves and per-signal-type rates as open refinements
+ * (II.6), so the simplest defensible shape ships first.
+ */
+export function arrowDecayLevel(signal, nowMs) {
+  if (!signal || !signal.date) return null;
+  const signalMs = Date.parse(signal.date);
+  if (Number.isNaN(signalMs)) return null;
+  const days = Math.max(0, (nowMs - signalMs) / MS_PER_DAY);
+  const level = Math.floor(days / ARROW_LEVEL_DAYS);
+  return level >= ARROW_MAX_LEVELS ? null : level;
+}

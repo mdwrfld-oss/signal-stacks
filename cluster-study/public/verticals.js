@@ -48,16 +48,22 @@ export const CULTURAL_VERTICALS = [
 /**
  * 0–5 display scores → normalized weights summing to 1 (II.1 storage rule).
  * Unknown vertical ids are ignored; returns null when nothing scores > 0.
+ *
+ * `gamma` (default 1 = plain proportional weights) raises each score to an
+ * exponent before normalizing. gamma > 1 sharpens the profile: a 5 pulls
+ * disproportionately harder than a 3, so entities spread toward their
+ * dominant wells instead of collapsing into the map centroid. Presentation
+ * tuning only — the stored 0–5 scores and the panel display are untouched.
  */
-export function normalizeScores(scores, taxonomy) {
+export function normalizeScores(scores, taxonomy, gamma = 1) {
   if (!scores) return null;
   let total = 0;
   const clean = {};
   for (const v of taxonomy) {
     const s = Math.max(0, Math.min(5, Number(scores[v.id]) || 0));
     if (s > 0) {
-      clean[v.id] = s;
-      total += s;
+      clean[v.id] = Math.pow(s, gamma);
+      total += clean[v.id];
     }
   }
   if (total === 0) return null;
