@@ -227,7 +227,6 @@ if (createUnmatched) {
       is_g7_client: false,
       confidence: null,
       g7_notes: row.summary ? { relationship_notes: row.summary } : null,
-      coi_sensitive: String(row.alcohol_coi_flag).toUpperCase() === 'TRUE',
       signal: {
         strength: Math.min(1, (parseFloat(row.score) || 50) / 100),
         date,

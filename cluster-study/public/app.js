@@ -7,10 +7,10 @@
  * changes visibility treatment only — dim/desaturate, never reposition — so
  * spatial memory holds.
  *
- * Visual grammar (Section 5): ring = active signal exists; fill darkness =
- * relevance (purple gradient); static gray = floor state (no signal ever).
- * Corporate families get convex hulls (Section 6a.1); structural analogs
- * render only while a node is selected (Section 6a.7).
+ * Visual grammar (II.3): white glow = G7 client (evidenced relationship);
+ * gray glow fading with age = live signal; dim = floor state. Corporate
+ * families render as concentric rings (II.4). Ghost mode (II.14) draws a
+ * dim duplicate at a node's previous-snapshot position when history exists.
  *
  * ?demo=1 injects synthetic signals client-side for tuning the grammar and
  * propagation before real Signal Stacks data exists. Demo data never touches
@@ -24,7 +24,6 @@ import {
   isNewAddition,
   arrowDecayLevel,
 } from '/scoring.js';
-import { computeGravity } from '/gravity.js';
 import {
   BUSINESS_VERTICALS,
   CULTURAL_VERTICALS,
@@ -93,7 +92,6 @@ const state = {
   effective: new Map(),
   nodesById: new Map(),
   neighborHubs: new Map(), // adjacent/parent id -> Set(hub ids) for lens membership
-  analogPairs: [],
 };
 
 /* II.3 color model: the purple fill gradient is gone. Base state — clients
@@ -140,26 +138,6 @@ function prepare(graph) {
   const now = Date.now();
   state.effective = computeEffectiveRelevance(graph.nodes, graph.links, now, state.config);
   state.nodesById = new Map(graph.nodes.map((n) => [n.id, n]));
-  state.analogPairs = graph.structural_analogs || [];
-
-  // II.7 G7 Gravity inputs: which nodes sit in a corporate family containing
-  // a G7 client (relationship-access factor), and which appear in a
-  // structural-analog pair (lookalike factor).
-  state.analogIds = new Set(state.analogPairs.flatMap((p) => [p.a, p.b]));
-  state.clientFamilyIds = new Set();
-  const byParent = new Map();
-  for (const n of graph.nodes) {
-    if (!n.parent) continue;
-    if (!byParent.has(n.parent)) byParent.set(n.parent, []);
-    byParent.get(n.parent).push(n);
-  }
-  for (const [parentId, children] of byParent) {
-    const parent = state.nodesById.get(parentId);
-    const members = parent ? [parent, ...children] : children;
-    if (members.some((m) => m.is_g7_client)) {
-      for (const m of members) state.clientFamilyIds.add(m.id);
-    }
-  }
 
   // Label metrics via canvas so collision boxes exist before the settle runs
   // (DOM text can't be measured yet, and hidden labels measure as 0).
@@ -188,6 +166,33 @@ function prepare(graph) {
     n.boxHw = Math.max(ringExtent, n.labelW / 2) + 4;
     n.boxHh = (ringExtent + labelBottom) / 2 + 2;
     n.boxCy = (labelBottom - ringExtent) / 2; // box center sits below node center
+  }
+
+  // Step 3: parent glow state is AGGREGATED from its children — parents have
+  // no signal/relationship of their own. Every node gets a resolved
+  // {glowClient, glowRelevance, glowFloor} triple; applyGlow() reads it so the
+  // three-state rule (white / gray-signaled / floor-dim) is uniform. A parent
+  // glows white if ANY child is a G7 client; else gray at its brightest
+  // child's relevance; else floor-dim.
+  const childrenOf = new Map();
+  for (const n of graph.nodes) {
+    if (!n.parent) continue;
+    if (!childrenOf.has(n.parent)) childrenOf.set(n.parent, []);
+    childrenOf.get(n.parent).push(n);
+  }
+  for (const n of graph.nodes) {
+    if (n.type === 'parent') {
+      const kids = childrenOf.get(n.id) || [];
+      const client = kids.some((c) => c.is_g7_client);
+      const relevance = kids.reduce((m, c) => Math.max(m, c.relevance || 0), 0);
+      n.glowClient = client;
+      n.glowRelevance = relevance;
+      n.glowFloor = !client && relevance === 0;
+    } else {
+      n.glowClient = n.is_g7_client;
+      n.glowRelevance = n.relevance;
+      n.glowFloor = n.floor;
+    }
   }
 
   // Lens membership for nodes without their own zone: an adjacent brand or a
@@ -279,11 +284,17 @@ function render(graph) {
   }
 
   const viewport = svg.append('g').attr('id', 'viewport').attr('class', 'zoomed-out');
-  const wellLabelLayer = viewport.append('g').attr('class', 'well-label-layer');
+  // Cartographic well labels — one layer per map, each faded by the active
+  // landscape (cultural on .cultural-active, business otherwise).
+  const culturalLabelLayer = viewport.append('g').attr('class', 'well-label-layer cultural-chrome');
+  const businessLabelLayer = viewport.append('g').attr('class', 'well-label-layer business-chrome');
   const hullLayer = viewport.append('g');
   const linkLayer = viewport.append('g');
-  const vectorLayer = viewport.append('g').attr('class', 'vector-layer');
-  const analogLayer = viewport.append('g');
+  const vectorLayer = viewport.append('g').attr('class', 'vector-layer cultural-chrome');
+  // II.14 ghost mode: behind the live nodes, a dim duplicate at each entity's
+  // previous-snapshot position + a fading connector to its current one. Empty
+  // today (single snapshot); wired to populate the moment history exists.
+  const ghostLayer = viewport.append('g').attr('class', 'ghost-layer');
   const nodeLayer = viewport.append('g');
 
   /* II.2 well anchors — attractors the position math pulls toward. Business
@@ -312,11 +323,34 @@ function render(graph) {
     const a = culturalAnchors.get(v.id);
     return { id: v.id, label: v.label, x: cx + (a.x - cx) * WELL_LABEL_RADIUS, y: cy + (a.y - cy) * WELL_LABEL_RADIUS };
   });
-  const wellLabels = wellLabelLayer
+  const wellLabels = culturalLabelLayer
     .selectAll('text')
     .data(wellLabelPoints)
     .join('text')
     .attr('class', 'well-label')
+    .attr('text-anchor', 'middle')
+    .attr('x', (d) => d.x)
+    .attr('y', (d) => d.y)
+    .text((d) => d.label.toUpperCase());
+
+  /* Step 6: business well labels — same faint cartographic treatment on the
+     3×3 grid of business anchors. Pushed radially outward from grid center so
+     each label sits just beyond its cluster (the center well nudges up). */
+  const BIZ_LABEL_OFFSET = 150;
+  const businessLabelPoints = BUSINESS_VERTICALS.map((v) => {
+    const a = businessAnchors.get(v.id);
+    const dx = a.x - cx;
+    const dy = a.y - cy;
+    const len = Math.hypot(dx, dy);
+    const x = len < 1 ? cx : a.x + (dx / len) * BIZ_LABEL_OFFSET;
+    const y = len < 1 ? cy - 120 : a.y + (dy / len) * BIZ_LABEL_OFFSET;
+    return { id: v.id, label: v.label, x, y };
+  });
+  businessLabelLayer
+    .selectAll('text')
+    .data(businessLabelPoints)
+    .join('text')
+    .attr('class', 'well-label business')
     .attr('text-anchor', 'middle')
     .attr('x', (d) => d.x)
     .attr('y', (d) => d.y)
@@ -337,8 +371,7 @@ function render(graph) {
     .attr('d', 'M 0 0 L 10 5 L 0 10 z')
     .attr('fill', '#ffd22e');
 
-  // Structural analogs stay OUT of the layout links: not physical proximity,
-  // not a persistent line (Section 6a.7).
+  // Layout links drive both the force simulation and the rendered edges.
   const layoutLinks = graph.links.map((l) => ({ ...l }));
   const families = buildFamilies(graph);
 
@@ -496,11 +529,15 @@ function render(graph) {
     .attr('r', (d) => d.r);
 
   /* links */
+  // Step 4: mark links touching an adjacent node so CSS can hide them
+  // alongside the cloaked adjacents on the Cultural Landscape.
+  const endpointType = (v) => (typeof v === 'object' ? v.type : state.nodesById.get(v)?.type);
+  const touchesAdjacent = (l) => endpointType(l.source) === 'adjacent' || endpointType(l.target) === 'adjacent';
   const link = linkLayer
     .selectAll('line')
     .data(layoutLinks)
     .join('line')
-    .attr('class', (d) => `link ${d.relationship}`);
+    .attr('class', (d) => `link ${d.relationship}${touchesAdjacent(d) ? ' adjacent-link' : ''}`);
 
   /* II.6 signal vectors: one arrow per (signal, evidenced cultural well),
      pointing from the node toward that well's anchor — the signal's pull on
@@ -546,7 +583,8 @@ function render(graph) {
     .selectAll('g.node')
     .data(graph.nodes)
     .join('g')
-    .attr('class', 'node')
+    // Step 4: type class lets CSS cloak adjacents on the Cultural Landscape.
+    .attr('class', (d) => `node type-${d.type}`)
     .on('click', (event, d) => {
       event.stopPropagation();
       selectNode(d);
@@ -589,10 +627,11 @@ function render(graph) {
         return;
       }
       c.style('opacity', null);
-      if (d.is_g7_client) {
+      // Step 3: read the resolved glow triple (parents aggregate children).
+      if (d.glowClient) {
         c.style('fill', '#f5f3ff').style('filter', null).classed('glow-client', true);
-      } else if (!d.floor) {
-        const a = 0.25 + 0.6 * Math.min(1, d.relevance);
+      } else if (!d.glowFloor) {
+        const a = 0.25 + 0.6 * Math.min(1, d.glowRelevance);
         c.style('fill', '#8f8fa3').style(
           'filter',
           `drop-shadow(0 0 5px rgba(205,205,220,${a})) drop-shadow(0 0 12px rgba(180,180,205,${a * 0.6}))`
@@ -687,12 +726,12 @@ function render(graph) {
   // landscapes have different footprints (grid vs ellipse), so fit follows
   // the map being shown.
   function fitTransform(mapId = state.map) {
-    // Cultural fit includes the well-label ring, so the labels that give
-    // placement its meaning are on screen by default (wider pad: the label
-    // text is anchored middle and extends past its point).
-    const pad = mapId === 'cultural' ? 130 : 80;
+    // Both maps fit their well-label ring into the default view, so the
+    // labels that give placement its meaning are on screen from the start
+    // (wider pad: labels are middle-anchored and extend past their points).
+    const pad = 130;
     const pts = [...mapPositions[mapId].values()];
-    if (mapId === 'cultural') pts.push(...wellLabelPoints);
+    pts.push(...(mapId === 'cultural' ? wellLabelPoints : businessLabelPoints));
     const xs = d3.extent(pts, (p) => p.x);
     const ys = d3.extent(pts, (p) => p.y);
     const dx = xs[1] - xs[0] + pad * 2;
@@ -779,6 +818,48 @@ function render(graph) {
   });
   svg.call(zoom.transform, fitTransform());
 
+  /* II.14 ghost mode: a dim duplicate at each entity's PREVIOUS-snapshot
+     position, joined to its current position by a thin fading connector — a
+     "where it came from" trail. Positions are per map. No history exists yet
+     (single snapshot), so previousPositions() is empty and nothing renders;
+     the moment a second snapshot lands on graph.previous_positions the trail
+     appears with zero further wiring. `?ghost=1` synthesizes an offset prior
+     position purely to exercise/verify this path today. */
+  const ghostDemo = new URLSearchParams(location.search).has('ghost');
+  function previousPositions(mapId) {
+    const prev = new Map();
+    const source = state.graph.previous_positions?.[mapId]; // { id: {x, y} }
+    if (source) {
+      for (const n of graph.nodes) if (source[n.id]) prev.set(n.id, source[n.id]);
+    } else if (ghostDemo) {
+      for (const n of graph.nodes) {
+        const p = mapPositions[mapId].get(n.id);
+        if (p) prev.set(n.id, { x: p.x - 46, y: p.y - 30 });
+      }
+    }
+    return prev;
+  }
+  const ghost = ghostLayer
+    .selectAll('g.ghost')
+    .data(graph.nodes, (d) => d.id)
+    .join((enter) => {
+      const g = enter.append('g').attr('class', (d) => `ghost type-${d.type}`);
+      g.append('line').attr('class', 'ghost-link');
+      g.append('circle').attr('class', 'ghost-node');
+      return g;
+    });
+  function updateGhosts() {
+    const prev = previousPositions(state.map);
+    ghost.each(function (d) {
+      const g = d3.select(this);
+      const p = prev.get(d.id);
+      if (!p) return g.style('display', 'none');
+      g.style('display', null);
+      g.select('circle.ghost-node').attr('cx', p.x).attr('cy', p.y).attr('r', d.r);
+      g.select('line.ghost-link').attr('x1', p.x).attr('y1', p.y).attr('x2', d.x).attr('y2', d.y);
+    });
+  }
+
   /* tick */
   function ticked() {
     node.attr('transform', (d) => `translate(${d.x},${d.y})`);
@@ -789,7 +870,7 @@ function render(graph) {
       .attr('y2', (d) => d.target.y);
     orbitGroup.attr('transform', (d) => `translate(${d.parent.x},${d.parent.y})`);
     updateVectors();
-    updateAnalogLines();
+    updateGhosts();
   }
   simulation.on('tick', ticked);
   ticked();
@@ -846,45 +927,12 @@ function render(graph) {
     applyFilters();
   });
 
-  /* selection-triggered structural analog highlight (Section 6a.7) */
-  function updateAnalogLines() {
-    const pairs = activeAnalogPairs();
-    analogLayer
-      .selectAll('line')
-      .data(pairs, (p) => p.key)
-      .join('line')
-      .attr('class', 'analog-link')
-      .attr('x1', (p) => p.a.x)
-      .attr('y1', (p) => p.a.y)
-      .attr('x2', (p) => p.b.x)
-      .attr('y2', (p) => p.b.y);
-    node.classed(
-      'analog-partner',
-      (d) => !!state.selected && pairs.some((p) => p.a.id === d.id || p.b.id === d.id) && d.id !== state.selected.id
-    );
-  }
-
-  function activeAnalogPairs() {
-    if (!state.selected) return [];
-    return state.analogPairs
-      .filter((p) => p.pair.includes(state.selected.id))
-      .map((p) => ({
-        key: p.pair.join('~'),
-        a: state.nodesById.get(p.pair[0]),
-        b: state.nodesById.get(p.pair[1]),
-        note: p.note,
-      }))
-      .filter((p) => p.a && p.b);
-  }
-
   function selectNode(d) {
     state.selected = d;
     node.classed('selected', (n) => n.id === d.id);
     // §4h: selection highlights ALL of the node's connectors — competitor,
     // analogous-audience, parent/subsidiary — and its neighbors; everything
-    // else dims slightly. Structural-analog lines (6a.7) are the one case
-    // where the edge is CREATED on selection; grounded edges just get
-    // emphasized. Same rule, two renderings.
+    // else dims (harder on the Cultural Landscape, §II.13 — see CSS).
     const neighbors = new Set();
     for (const l of layoutLinks) {
       if (l.source === d) neighbors.add(l.target);
@@ -893,16 +941,14 @@ function render(graph) {
     viewport.classed('has-selection', true);
     link.classed('connected', (l) => l.source === d || l.target === d);
     node.classed('neighbor', (n) => neighbors.has(n));
-    updateAnalogLines();
     showPanel(d);
   }
 
   function clearSelection() {
     state.selected = null;
     viewport.classed('has-selection', false);
-    node.classed('selected', false).classed('analog-partner', false).classed('neighbor', false);
+    node.classed('selected', false).classed('neighbor', false);
     link.classed('connected', false);
-    updateAnalogLines();
     panel.classList.add('hidden');
   }
 
@@ -1046,8 +1092,14 @@ function showPanel(d) {
     );
   }
   if (d.sister_agency) badges.push('<span class="badge sister">SISTER AGENCY</span>');
-  if (d.coi_sensitive) badges.push('<span class="badge coi">COI-SENSITIVE</span>');
   if (badges.length) parts.push(`<p>${badges.join(' ')}</p>`);
+
+  /* Step 7: radar (spike burst) + cultural accordion sit at the top, right
+     under the header — the entity's cultural profile at a glance. */
+  if (d.cultural_verticals) {
+    parts.push(radarSpikeBurst(d.cultural_verticals));
+    parts.push(culturalAccordion(d.cultural_verticals));
+  }
 
   /* relevance / signal state */
   parts.push('<h3>Signal</h3>');
@@ -1072,33 +1124,24 @@ function showPanel(d) {
     parts.push('</p>');
   }
 
-  /* II.7 G7 Gravity — first-draft formula, factor breakdown, proxy inputs
-     labeled as such. Skipped for pure competitor context nodes (adjacents
-     with no scoring and no signal) where every factor would be a default. */
-  if (d.type !== 'adjacent' || d.signal || d.cultural_verticals) {
-    const g = computeGravity(
-      d,
-      {
-        relevance: eff?.relevance || 0,
-        inClientFamily: state.clientFamilyIds.has(d.id),
-        hasAnalog: state.analogIds.has(d.id),
-      },
-      Date.now()
-    );
-    parts.push(`<h3>G7 Gravity — <strong>${g.score}</strong>/100 <span class="trend ${g.trend.dir}">${g.trend.dir === 'rising' ? '▲ rising' : '― stable'}</span></h3>`);
-    parts.push('<ul class="gravity-factors">');
-    for (const f of g.factors) {
-      parts.push(
-        `<li><span class="gf-points">${f.points.toFixed(1).replace(/\.0$/, '')}/${f.weight}</span> ${esc(f.label)}<br><span class="rel-note">${esc(f.basis)}</span></li>`
-      );
-    }
-    for (const p of g.penalties) {
-      parts.push(`<li class="gf-penalty"><span class="gf-points">−${p.points}</span> ${esc(p.label)}<br><span class="rel-note">${esc(p.basis)}</span></li>`);
-    }
+  /* Step 2: Notable factors — a plain, unscored list. Only lines that are
+     actually true for the entity appear; no math, synthesis, or verdict (the
+     G7 Gravity composite was removed). Cultural strength lives in the radar
+     above, not here. */
+  const notable = [];
+  if (d.is_g7_client) notable.push('Existing G7 client');
+  if (d.sister_agency) notable.push('Sister-agency relationship');
+  if (d.signal) {
+    const wells = Array.isArray(d.signal.cultural_wells)
+      ? d.signal.cultural_wells.map(wellLabel).filter(Boolean)
+      : [];
+    const evidenced = wells.length ? `, evidenced for ${esc(wells.join(', '))}` : '';
+    notable.push(`Signal detected — ${esc(elapsedSince(d.signal.date))}${evidenced}`);
+  }
+  if (notable.length) {
+    parts.push('<h3>Notable factors</h3><ul>');
+    for (const line of notable) parts.push(`<li>${line}</li>`);
     parts.push('</ul>');
-    parts.push(
-      `<p class="rel-note">First-draft formula (II.7) — weights are a starting proposal, several inputs are labeled proxies until CAP and revenue data land. Trend: ${esc(g.trend.driver)}.</p>`
-    );
   }
 
   /* II.1 vertical profiles — displayed as 0–5 (stored as normalized weights) */
@@ -1109,9 +1152,10 @@ function showPanel(d) {
       .map((v) => `<li>${esc(v.label)} — <strong>${esc(scores[v.id])}</strong>/5</li>`);
     if (rows.length) parts.push(`<h3>${title}</h3><ul>${rows.join('')}</ul>`);
   };
-  if (d.business_verticals || d.cultural_verticals) {
+  // Cultural profile is the radar + accordion above; only the business list
+  // stays as text (no business radar this pass).
+  if (d.business_verticals) {
     profileSection('Business profile (0–5)', d.business_verticals, BUSINESS_VERTICALS);
-    profileSection('Cultural profile (0–5)', d.cultural_verticals, CULTURAL_VERTICALS);
   }
 
   /* notes */
@@ -1136,7 +1180,7 @@ function showPanel(d) {
     }
   }
 
-  /* relationships — COI surfaces here in the click-through, not on the map */
+  /* relationships (competitor / analogous audience / corporate family) */
   const rels = state.graph.links.filter(
     (l) => linkIdOf(l.source) === d.id || linkIdOf(l.target) === d.id
   );
@@ -1149,23 +1193,11 @@ function showPanel(d) {
         const other = state.nodesById.get(otherId);
         if (!other) continue;
         parts.push(
-          `<li>${esc(other.name)}${l.coi_sensitive ? ' <span class="badge coi" title="' + esc(l.coi_note || 'Outreach-cautious') + '">COI</span>' : ''}${l.note ? `<br><span class="rel-note">${esc(l.note)}</span>` : ''}</li>`
+          `<li>${esc(other.name)}${l.note ? `<br><span class="rel-note">${esc(l.note)}</span>` : ''}</li>`
         );
       }
       parts.push('</ul>');
     }
-  }
-
-  /* structural analogs (Section 6a.7 — shown only on selection) */
-  const analogs = state.analogPairs.filter((p) => p.pair.includes(d.id));
-  if (analogs.length) {
-    parts.push('<h3>Structurally analogous client</h3><ul>');
-    for (const p of analogs) {
-      const otherId = p.pair[0] === d.id ? p.pair[1] : p.pair[0];
-      const other = state.nodesById.get(otherId);
-      parts.push(`<li>${esc(other ? other.name : otherId)}${p.note ? `<br><span class="rel-note">${esc(p.note)}</span>` : ''}</li>`);
-    }
-    parts.push('</ul>');
   }
 
   /* talent history (Section 10.4) — gated on the Backbone Sheet talent_name field */
@@ -1250,4 +1282,105 @@ function esc(s) {
     '"': '&quot;',
     "'": '&#39;',
   })[c]);
+}
+
+const wellLabel = (id) => CULTURAL_VERTICALS.find((v) => v.id === id)?.label || id;
+
+/** Plain human-elapsed for the Notable-factors signal line (no decay math). */
+function elapsedSince(dateStr) {
+  const ms = Date.parse(dateStr);
+  if (Number.isNaN(ms)) return 'recently';
+  const days = Math.max(0, Math.round((Date.now() - ms) / 86400000));
+  if (days === 0) return 'today';
+  if (days < 14) return `${days} day${days > 1 ? 's' : ''} ago`;
+  if (days < 60) return `${Math.round(days / 7)} weeks ago`;
+  return `${Math.round(days / 30)} months ago`;
+}
+
+// Terse axis labels — the accordion below carries the full names + scores.
+const WELL_SHORT = {
+  music_performance: 'Music',
+  sports: 'Sports',
+  gaming: 'Gaming',
+  comedy: 'Comedy',
+  festival: 'Festival',
+  talent_celebrity_partnerships: 'Talent',
+  film_tv: 'Film/TV',
+  inclusion: 'Inclusion',
+  college_marketing: 'College',
+  outdoor_adventure: 'Outdoor',
+  inter_brand_collaborations: 'Collabs',
+  creator_influencer_partnerships: 'Creator',
+  wellness_fitness: 'Wellness',
+};
+
+/**
+ * Step 7 radar — SPIKE BURST: each of the 13 cultural wells is an INDEPENDENT
+ * triangular spike from center to its scored vertex. No connecting polygon,
+ * no blending between axes (visually or mathematically) — each spike is a
+ * standalone triangle so a high score on one well never visually "fills in"
+ * toward its neighbors.
+ */
+function radarSpikeBurst(scores) {
+  const size = 300;
+  const cx0 = size / 2;
+  const cy0 = 148;
+  const maxR = 92;
+  const n = CULTURAL_VERTICALS.length;
+  const parts = [];
+  // Faint reference rings at 1/3, 2/3, full so spike length reads as a score.
+  for (const frac of [1 / 3, 2 / 3, 1]) {
+    parts.push(`<circle class="radar-ring" cx="${cx0}" cy="${cy0}" r="${(maxR * frac).toFixed(1)}" />`);
+  }
+  CULTURAL_VERTICALS.forEach((v, i) => {
+    const a = (i / n) * 2 * Math.PI - Math.PI / 2;
+    const cos = Math.cos(a);
+    const sin = Math.sin(a);
+    parts.push(
+      `<line class="radar-axis" x1="${cx0}" y1="${cy0}" x2="${(cx0 + cos * maxR).toFixed(1)}" y2="${(cy0 + sin * maxR).toFixed(1)}" />`
+    );
+    const s = Math.max(0, Math.min(5, Number(scores[v.id]) || 0));
+    if (s > 0) {
+      const r = (s / 5) * maxR;
+      const apexX = cx0 + cos * r;
+      const apexY = cy0 + sin * r;
+      const bw = 5; // base half-width — narrow so spikes stay distinct
+      const px = -sin * bw;
+      const py = cos * bw;
+      parts.push(
+        `<path class="radar-spike" d="M${(cx0 + px).toFixed(1)},${(cy0 + py).toFixed(1)} L${apexX.toFixed(1)},${apexY.toFixed(1)} L${(cx0 - px).toFixed(1)},${(cy0 - py).toFixed(1)} Z" />`
+      );
+    }
+    const lx = cx0 + cos * (maxR + 11);
+    const ly = cy0 + sin * (maxR + 11);
+    const anchor = cos > 0.3 ? 'start' : cos < -0.3 ? 'end' : 'middle';
+    parts.push(
+      `<text class="radar-axis-label" x="${lx.toFixed(1)}" y="${(ly + 3).toFixed(1)}" text-anchor="${anchor}">${esc(WELL_SHORT[v.id] || v.label)}</text>`
+    );
+  });
+  return `<svg class="radar" viewBox="0 0 ${size} ${size}" role="img" aria-label="Cultural affinity spike burst">${parts.join('')}</svg>`;
+}
+
+const RUBRIC_SUBFACTORS = [
+  'Historical Depth',
+  'Recurrence',
+  'Strategic Importance',
+  'Recent Momentum',
+  'Breadth of Activity',
+];
+
+/**
+ * Step 7 accordion — one <details> row per cultural well (name + current
+ * score). Expanding reveals the five rubric sub-factors, each 'pending': the
+ * Cultural Affinity Processor will populate them. No fabricated numbers.
+ */
+function culturalAccordion(scores) {
+  const rows = CULTURAL_VERTICALS.map((v) => {
+    const s = Math.max(0, Math.min(5, Number(scores[v.id]) || 0));
+    const subs = RUBRIC_SUBFACTORS.map(
+      (r) => `<div class="rubric-row"><span>${esc(r)}</span><span class="pending">pending</span></div>`
+    ).join('');
+    return `<details class="cult-row"><summary><span class="cult-name">${esc(v.label)}</span><span class="cult-score">${s}/5</span></summary><div class="rubric">${subs}<p class="rel-note">Populates once the Cultural Affinity Processor is live.</p></div></details>`;
+  }).join('');
+  return `<h3>Cultural categories</h3><div class="accordion">${rows}</div>`;
 }

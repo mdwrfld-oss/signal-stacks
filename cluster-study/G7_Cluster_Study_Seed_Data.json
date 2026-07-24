@@ -7,8 +7,7 @@
     },
     "relationship_types": [
       "direct_competitor",
-      "analogous_audience",
-      "structurally_analogous_client (corporate_parents level only)"
+      "analogous_audience"
     ],
     "generated": "2026-07-05",
     "source_doc": "G7_Cluster_Study_Seed_Dataset.md",
@@ -41,7 +40,10 @@
     "vertical_notes_update": "Film/TV and Inclusion confirmed as two separate cultural verticals (13 wells total, not merged). Existing 'film_tv_inclusion' scores were split: renamed to 'film_tv' (score preserved), with a new 'inclusion' field. RESOLVED 2026-07-11: all 19 entities now have an Inclusion score (two user-provided FPO batches). One data gap surfaced during this pass and was fixed separately: rendezvous_music_festival had no cultural_verticals object at all (missed by both the original 14-entity and later 4-new-entity FPO rounds) -- it now has the full 13-well object with Inclusion (2) populated and the remaining 12 wells null, still needing a scoring pass. Mojo Energy Pouches' Inclusion was set to 1 (no evidence found) -- its parent/operating-entity structure (Swisher subsidiary) remains a separate unresolved question, flagged on the node itself and in corporate_parents.",
     "business_verticals_source": "Claude first-pass draft across all 19 hub nodes, reviewed and corrected by user 2026-07-11. See vertical_notes for taxonomy-expansion rationale. Scores are a first pass built from category descriptions, not deep per-entity research -- most entities score high on exactly one well; real cross-vertical research (the kind the cultural pass received) is future work, not done here.",
     "rendezvous_cultural_gap_resolved": "RESOLVED 2026-07-11: rendezvous_music_festival now has a complete 13-well cultural_verticals object (previously missing entirely -- see vertical_notes_update). All 19 hub nodes now have complete cultural_verticals scoring.",
-    "inclusion_scale_resolved": "RESOLVED 2026-07-11: the four half-point Inclusion scores (Atlassian, Workday, Reddit, PLL -- originally 4.5) were rounded down to 4 to keep the integer 0-5 scale consistent across cultural_verticals and business_verticals. Cisco and Ulta Beauty's Inclusion scores of 5 were already whole numbers and are unaffected."
+    "inclusion_scale_resolved": "RESOLVED 2026-07-11: the four half-point Inclusion scores (Atlassian, Workday, Reddit, PLL -- originally 4.5) were rounded down to 4 to keep the integer 0-5 scale consistent across cultural_verticals and business_verticals. Cisco and Ulta Beauty's Inclusion scores of 5 were already whole numbers and are unaffected.",
+    "structural_analogs_removed": "RESOLVED 2026-07-20: the structural_analogs field/relationship type has been removed entirely. Reasoning: unlike direct_competitor and analogous_audience (defensible from observable market facts), structural analogy was an inherently subjective judgment call that visually implied a factual relationship it wasn't. Dropped ahead of the broader team showing.",
+    "is_g7_client_definition": "REDEFINED 2026-07-20: is_g7_client means \"G7 has a real, evidenced relationship with this entity\" (current or lapsed) — not \"actively working together this quarter.\" Current/lapsed distinction remains in g7_notes.relationship_notes as text, not as a separate visual/color channel. See plan doc II.15.",
+    "coi_flag_removed": "REMOVED 2026-07-20: the coi_sensitive/coi_note fields on adjacent competitor entries (MABI-family competitors) have been dropped entirely. Reasoning: many brands span multiple product lines where only some genuinely conflict with a client relationship and others don't -- an entity-level COI flag can't accurately represent that nuance, and a wrong flag (in either direction) is worse than no flag. NBD judgment covers this better than a blanket data-layer marker. Distinct from the narrower, still-valid talent-partnership-overlap COI concept in plan doc Sec. 10.3/10.4, which is unaffected."
   },
   "hub_nodes": [
     {
@@ -374,9 +376,9 @@
       ],
       "g7_notes": {
         "case_study_learnings": "Consumers must be strongly incentivized to engage. Effective pattern: load the experience with incentives and directly link TurboTax employees with consumers for follow-up after the event. Has partnered with talent on economic-fluency-themed initiatives.",
-        "relationship_notes": "Lapsed — last worked together roughly a year ago, not a current client. G7 has done both Experiential and Talent Booking work for them, at both the TurboTax and Intuit corporate level."
+        "relationship_notes": "Lapsed — last worked together roughly a year ago, not a current client. G7 has done both Experiential and Talent Booking work for them, at both the TurboTax and Intuit corporate level. [is_g7_client flipped to true 2026-07-20: the flag now means \"real, evidenced relationship\" (current or lapsed), not \"actively working together this quarter\" — see plan doc II.15 / Section 9 resolution. Lapsed status itself remains documented here, just no longer drives a different glow color.]"
       },
-      "is_g7_client": false,
+      "is_g7_client": true,
       "sister_agency": false,
       "cultural_verticals": {
         "music_performance": 2,
@@ -832,16 +834,12 @@
         {
           "name": "Twisted Tea",
           "relationship": "direct_competitor",
-          "note": "Category-defining rival in flavored malt beverages",
-          "coi_sensitive": true,
-          "coi_note": "MABI is G7's most significant client relationship — direct competitors in this family's core categories should be treated as outreach-cautious, not simply scored and pursued like a standard lookalike."
+          "note": "Category-defining rival in flavored malt beverages"
         },
         {
           "name": "Smirnoff Ice",
           "relationship": "direct_competitor",
-          "note": "Historic category leader (Diageo)",
-          "coi_sensitive": true,
-          "coi_note": "Same MABI sensitivity as above."
+          "note": "Historic category leader (Diageo)"
         }
       ],
       "is_g7_client": true,
@@ -888,37 +886,27 @@
         {
           "name": "Jose Cuervo Authentic",
           "relationship": "direct_competitor",
-          "note": "Major spirits-brand RTD margarita entry",
-          "coi_sensitive": true,
-          "coi_note": "MABI sensitivity — treat as outreach-cautious."
+          "note": "Major spirits-brand RTD margarita entry"
         },
         {
           "name": "1800 Ready-to-Drink",
           "relationship": "direct_competitor",
-          "note": "Tequila-brand RTD margarita line",
-          "coi_sensitive": true,
-          "coi_note": "MABI sensitivity — treat as outreach-cautious."
+          "note": "Tequila-brand RTD margarita line"
         },
         {
           "name": "Cutwater Spirits",
           "relationship": "direct_competitor",
-          "note": "Craft canned cocktail brand (Anheuser-Busch owned)",
-          "coi_sensitive": true,
-          "coi_note": "MABI sensitivity — treat as outreach-cautious."
+          "note": "Craft canned cocktail brand (Anheuser-Busch owned)"
         },
         {
           "name": "On The Rocks",
           "relationship": "direct_competitor",
-          "note": "Premium canned cocktail brand",
-          "coi_sensitive": true,
-          "coi_note": "MABI sensitivity — treat as outreach-cautious."
+          "note": "Premium canned cocktail brand"
         },
         {
           "name": "Ritas (Lime-A-Rita)",
           "relationship": "direct_competitor",
-          "note": "Anheuser-Busch's malt-based margarita entry",
-          "coi_sensitive": true,
-          "coi_note": "MABI sensitivity — treat as outreach-cautious."
+          "note": "Anheuser-Busch's malt-based margarita entry"
         }
       ],
       "is_g7_client": true,
@@ -965,23 +953,17 @@
         {
           "name": "Jose Cuervo Authentic",
           "relationship": "direct_competitor",
-          "note": "Same RTD tequila-cocktail category as Olé",
-          "coi_sensitive": true,
-          "coi_note": "MABI sensitivity — treat as outreach-cautious."
+          "note": "Same RTD tequila-cocktail category as Olé"
         },
         {
           "name": "1800 Ready-to-Drink",
           "relationship": "direct_competitor",
-          "note": "Same category",
-          "coi_sensitive": true,
-          "coi_note": "MABI sensitivity — treat as outreach-cautious."
+          "note": "Same category"
         },
         {
           "name": "Cutwater Spirits",
           "relationship": "direct_competitor",
-          "note": "Same category",
-          "coi_sensitive": true,
-          "coi_note": "MABI sensitivity — treat as outreach-cautious."
+          "note": "Same category"
         }
       ],
       "is_g7_client": true,
@@ -1074,7 +1056,7 @@
         "film_tv": 1,
         "inclusion": 1
       },
-      "cultural_verticals_source": "FPO sheet, user-provided 2026-07-11 — pending Film/TV vs Inclusion split resolution Inclusion: parent/operating-entity structure unresolved per 2026-07-11 FPO pass -- flagged N/A, not yet scorable. Inclusion set to 1 (no evidence found) 2026-07-11 -- parent/operating-entity question remains separately unresolved (see note above).",
+      "cultural_verticals_source": "FPO sheet, user-provided 2026-07-11 — pending Film/TV vs Inclusion split resolution Inclusion: parent/operating-entity structure unresolved per 2026-07-11 FPO pass -- flagged N/A, not yet scorable. Inclusion set to 1 (2026-07-11) -- kept deliberately, not a confidence gap: Mojo is a very new company/product, so a low score reflects genuine current absence of Inclusion programming (Historical Depth / Recurrence, not Confidence, per Cultural Affinity Processor spec Sec. 3). Expected to be picked up by the future Recent Momentum layer if/when Inclusion initiatives roll out, rather than requiring a static-score correction now. Parent/operating-entity question remains separately unresolved (see note above).",
       "business_verticals": {
         "food_beverage": 2,
         "automotive_transportation": 1,
@@ -1311,16 +1293,6 @@
       "note": "G7 runs the Rendezvous Music Festival for JHMR end-to-end (Experiential + Talent Booking). JHMR is the parent/hosting resort; the festival itself is the actual G7 client program and the scored hub node.",
       "confidence": "user_provided",
       "flag": null
-    }
-  ],
-  "structural_analogs": [
-    {
-      "pair": [
-        "mark_anthony_brands",
-        "swisher"
-      ],
-      "relationship": "structurally_analogous_client",
-      "note": "Not competitors and not audience-analogous brands — these are two multi-brand parent clients where G7's work looks similar across children. Useful for understanding how to structure/pitch multi-brand parent relationships, not for lookalike-brand outreach. This is a distinct relationship type from direct_competitor and analogous_audience, tracked at the corporate_parents level rather than between individual hub nodes."
     }
   ]
 }

@@ -52,21 +52,19 @@ describe('buildGraphFromSeed', () => {
     expect(graph.nodes.find((n) => n.id === 'white_claw').parent).toBe('mark_anthony_brands');
   });
 
-  it('keeps structural analogs out of links (Section 6a.7)', () => {
-    expect(graph.structural_analogs).toEqual([
-      expect.objectContaining({ pair: ['mark_anthony_brands', 'swisher'] }),
-    ]);
-    expect(graph.links.some((l) => l.relationship === 'structurally_analogous_client')).toBe(false);
+  it('no longer emits structural_analogs (removed 2026-07-20)', () => {
+    expect(graph.structural_analogs).toBeUndefined();
+    expect(graph.links.some((l) => l.relationship === 'structural_analog')).toBe(false);
   });
 
-  it('carries the §5a client identity marker (clients true; lapsed and non-clients false)', () => {
+  it('carries the redefined is_g7_client marker (evidenced relationship, current OR lapsed)', () => {
     const byId = (id) => graph.nodes.find((n) => n.id === id);
     expect(byId('white_claw').is_g7_client).toBe(true);
-    expect(byId('turbotax_intuit').is_g7_client).toBe(false); // lapsed — stays floor-gray
+    // Redefined 2026-07-20: "real, evidenced relationship" (current or lapsed).
+    // TurboTax/Intuit is a lapsed relationship — now true, no hardcoded exception.
+    expect(byId('turbotax_intuit').is_g7_client).toBe(true);
     expect(byId('yeti').is_g7_client).toBe(false); // adjacent brand
     expect(byId('mark_anthony_brands').is_g7_client).toBe(false); // parent, not a direct client
-    // Note: the seed marks 14 hubs true (incl. Olé); the plan §5a list has 13
-    // (Olé absent) — the build trusts the JSON. Flagged for reconciliation.
     expect(graph.nodes.filter((n) => n.is_g7_client).length).toBeGreaterThanOrEqual(13);
   });
 
@@ -77,10 +75,9 @@ describe('buildGraphFromSeed', () => {
     ]);
   });
 
-  it('carries COI flags onto links and nodes', () => {
-    const twisted = graph.links.find((l) => l.target === 'twisted_tea');
-    expect(twisted.coi_sensitive).toBe(true);
-    expect(twisted.coi_note).toMatch(/MABI/);
+  it('no longer emits coi_sensitive/coi_note on nodes or links (removed 2026-07-20)', () => {
+    expect(graph.nodes.every((n) => !('coi_sensitive' in n))).toBe(true);
+    expect(graph.links.every((l) => !('coi_sensitive' in l) && !('coi_note' in l))).toBe(true);
   });
 });
 
@@ -116,9 +113,11 @@ describe('buildGraphFromSheet', () => {
     expect(parentLinks.length).toBe(1);
   });
 
-  it('parses boolean-ish COI flags', () => {
-    expect(graph.nodes.find((n) => n.id === 'truly').coi_sensitive).toBe(true);
-    expect(graph.links.find((l) => l.target === 'truly').coi_sensitive).toBe(true);
+  it('ignores retired coi_sensitive columns without emitting the field', () => {
+    // The sample rows still carry coi_sensitive columns; the builder must drop
+    // them silently (field retired 2026-07-20), not surface them.
+    expect(graph.nodes.every((n) => !('coi_sensitive' in n))).toBe(true);
+    expect(graph.links.every((l) => !('coi_sensitive' in l))).toBe(true);
   });
 });
 

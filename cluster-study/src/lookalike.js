@@ -256,7 +256,6 @@ RULES: 3-5 entries, most relevant first, no duplicates, never include ${source.n
           target: existing.id,
           relationship: c.relationship,
           note: c.note || '',
-          coi_sensitive: false,
         });
         connected.push(existing.name);
       }
@@ -277,7 +276,6 @@ RULES: 3-5 entries, most relevant first, no duplicates, never include ${source.n
       g7_notes: {
         relationship_notes: `Generated competitor of ${source.name} (§6c on-demand search). ${c.note || ''}`,
       },
-      coi_sensitive: false,
       signal: null, // floor-gray until it earns a signal of its own (§6c)
       date_added: today,
       source: 'generated',
@@ -288,7 +286,6 @@ RULES: 3-5 entries, most relevant first, no duplicates, never include ${source.n
       target: id,
       relationship: c.relationship,
       note: c.note || '',
-      coi_sensitive: false,
     });
     byNorm.set(normalizeName(c.brand), node);
     added.push(c.brand);
@@ -338,7 +335,6 @@ export async function reviewBatch({ id, decisions }, env) {
           licensor_or_agency: candidate.licensor_or_agency || null,
           licensor_last_verified: candidate.licensor_last_verified || null,
         },
-        coi_sensitive: false,
         signal: null,
         date_added: today,
         source: 'rfp_lookalike',
@@ -350,7 +346,6 @@ export async function reviewBatch({ id, decisions }, env) {
         target: nodeId,
         relationship: candidate.relationship,
         note: candidate.rationale || '',
-        coi_sensitive: false,
       });
     }
   }

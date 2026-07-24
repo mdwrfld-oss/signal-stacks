@@ -118,22 +118,25 @@ body { display: flex; flex-direction: column; }
   stroke-dasharray: 6 6;
 }
 
-/* Cultural well labels + II.6 signal vectors: cultural-map-only chrome,
-   faded in/out by the cultural-active class applyMapChrome() sets. */
-.well-label-layer, .vector-layer {
+/* Cartographic well labels + II.6 signal vectors: per-map chrome, faded by
+   the active landscape. Cultural chrome shows on .cultural-active; business
+   chrome shows otherwise (business is the default map). */
+.cultural-chrome, .business-chrome {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.7s ease;
 }
-#canvas.cultural-active .well-label-layer,
-#canvas.cultural-active .vector-layer { opacity: 1; }
+#canvas.cultural-active .cultural-chrome { opacity: 1; }
+#canvas:not(.cultural-active) .business-chrome { opacity: 1; }
 .well-label {
-  fill: rgba(255, 210, 46, 0.38);
+  fill: rgba(255, 210, 46, 0.38); /* cultural: yellow accent */
   font-size: 17px;
   font-weight: 700;
   letter-spacing: 0.22em;
 }
 .well-label.active { fill: rgba(255, 210, 46, 0.95); }
+/* Step 6: business well labels in the business (purple) accent. */
+.well-label.business { fill: rgba(154, 108, 211, 0.4); }
 .signal-vector {
   stroke: #ffd22e;
   stroke-width: 2px;
@@ -141,13 +144,12 @@ body { display: flex; flex-direction: column; }
 }
 .signal-vector.dimmed { opacity: 0.06 !important; }
 
-/* Structural-analog highlight is part of selection (§4h) — map accent. */
-.analog-link {
-  stroke: var(--map-accent);
-  stroke-width: 2px;
-  stroke-dasharray: 7 5;
-  fill: none;
-}
+/* Step 4: cloak competitor/adjacent nodes (and their links + ghosts) on the
+   Cultural Landscape — they have no cultural_verticals, so their position
+   there is meaningless leftover placement. Fully visible on Business. */
+#canvas.cultural-active .node.type-adjacent,
+#canvas.cultural-active .ghost.type-adjacent,
+#canvas.cultural-active .link.adjacent-link { display: none; }
 
 .node { cursor: pointer; }
 .node circle.core { stroke: rgba(226, 221, 242, 0.22); stroke-width: 1px; }
@@ -166,7 +168,6 @@ body { display: flex; flex-direction: column; }
   stroke-width: 2.5px;
   filter: drop-shadow(0 0 7px var(--map-accent)) !important;
 }
-.node.analog-partner circle.core { stroke: var(--map-accent); stroke-width: 3px; }
 
 .ring { fill: none; stroke-width: 2.5px; }
 .ring.signal { stroke: var(--ring-signal); }
@@ -217,10 +218,13 @@ body { display: flex; flex-direction: column; }
 /* Lens dimming: switched-off, not removed (Section 4). */
 .dimmed { opacity: 0.1; filter: grayscale(0.85); transition: opacity 0.25s; }
 
-/* §4h selection: connected edges glow, everything else recedes slightly.
-   Filter dimming (.dimmed, §4g) stays stronger and is excluded here. */
+/* §4h selection: connected edges glow, everything else recedes. Business
+   keeps the lighter recede; Cultural (Step 5) dims near-invisible so a
+   selected node's real cultural neighborhood stands almost alone. */
 .has-selection .link:not(.connected):not(.dimmed) { opacity: 0.12; }
-.has-selection .node:not(.selected):not(.neighbor):not(.analog-partner):not(.dimmed) { opacity: 0.3; }
+.has-selection .node:not(.selected):not(.neighbor):not(.dimmed) { opacity: 0.3; }
+#canvas.cultural-active .has-selection .link:not(.connected):not(.dimmed) { opacity: 0.03; }
+#canvas.cultural-active .has-selection .node:not(.selected):not(.neighbor):not(.dimmed) { opacity: 0.05; }
 .link.connected {
   stroke: var(--map-accent); /* II.3: selection feedback carries the map's color */
   stroke-width: 2px;
@@ -314,7 +318,6 @@ body { display: flex; flex-direction: column; }
 .badge.client { background: #6a48b8; color: #fff; }
 .badge.signal { background: #123c34; color: #4ee0c2; }
 .badge.rfp { background: #45280f; color: #ffb26e; }
-.badge.coi { background: #451518; color: #ff9d9d; }
 .badge.sister { background: #4a3c10; color: #f2d24b; }
 .rel-note { color: var(--muted); font-size: 12px; }
 /* §6c Generate Competitors */
@@ -345,20 +348,43 @@ body { display: flex; flex-direction: column; }
 }
 .relevance-bar > div { height: 100%; background: #a886ff; }
 
-/* II.7 G7 Gravity factor breakdown */
-.gravity-factors { list-style: none; padding-left: 0; margin: 6px 0; }
-.gravity-factors li { margin-bottom: 5px; font-size: 12px; }
-.gf-points {
-  display: inline-block;
-  min-width: 52px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--g7-purple-light);
+/* Step 7 radar — spike burst (independent triangular spikes, no polygon). */
+.radar { width: 100%; height: auto; display: block; margin: 6px 0 2px; }
+.radar-ring { fill: none; stroke: rgba(139, 125, 216, 0.14); stroke-width: 1; }
+.radar-axis { stroke: rgba(139, 125, 216, 0.18); stroke-width: 1; }
+.radar-spike { fill: rgba(255, 210, 46, 0.7); stroke: #ffd22e; stroke-width: 0.75; }
+.radar-axis-label { fill: var(--muted); font-size: 8.5px; letter-spacing: 0.02em; }
+
+/* Step 7 accordion — one collapsible row per cultural well. */
+.accordion { margin: 4px 0; }
+.cult-row { border-bottom: 1px solid rgba(139, 125, 216, 0.14); }
+.cult-row > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 2px;
+  font-size: 13px;
 }
-.gf-penalty .gf-points { color: #e0685f; }
-.trend { font-size: 11px; font-weight: 600; margin-left: 6px; }
-.trend.rising { color: #2fd4b8; }
-.trend.stable { color: var(--muted); }
+.cult-row > summary::-webkit-details-marker { display: none; }
+.cult-row > summary::before { content: '▸'; color: var(--muted); margin-right: 6px; font-size: 10px; }
+.cult-row[open] > summary::before { content: '▾'; }
+.cult-name { flex: 1; }
+.cult-score { color: var(--g7-purple-light); font-weight: 700; font-variant-numeric: tabular-nums; }
+.rubric { padding: 2px 2px 8px 18px; }
+.rubric-row { display: flex; justify-content: space-between; font-size: 12px; margin: 3px 0; color: var(--text); }
+.rubric-row .pending {
+  color: var(--muted);
+  font-style: italic;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* II.14 ghost mode — dim duplicate at prior position + fading connector. */
+.ghost-node { fill: rgba(154, 146, 184, 0.28); stroke: none; }
+.ghost-link { stroke: rgba(154, 146, 184, 0.3); stroke-width: 1; stroke-dasharray: 3 4; }
 
 /* ---- legend & status ---- */
 

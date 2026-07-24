@@ -7,14 +7,13 @@
  * {
  *   generated, source, config,
  *   nodes: [{ id, name, type: hub|adjacent|parent, category, zone, parent,
- *             confidence, g7_notes, coi_sensitive, signal, date_added, source }],
- *   links: [{ source, target, relationship, note, coi_sensitive }],
- *   structural_analogs: [{ pair: [idA, idB], note }]
+ *             confidence, g7_notes, signal, date_added, source }],
+ *   links: [{ source, target, relationship, note }]
  * }
  *
  * Relationship types: direct_competitor | analogous_audience | parent_of.
- * Structural analogs are kept out of `links` on purpose — they render only
- * on selection (Section 6a.7), not as persistent edges or layout forces.
+ * (structural_analog and the coi_sensitive/coi_note fields were removed
+ * 2026-07-20 — see the seed _meta notes and plan doc II.15.)
  */
 
 import { DEFAULT_CONFIG } from '../public/scoring.js';
@@ -35,7 +34,6 @@ function baseGraph(source) {
     config: { ...DEFAULT_CONFIG },
     nodes: [],
     links: [],
-    structural_analogs: [],
   };
 }
 
@@ -83,7 +81,6 @@ export function buildGraphFromSeed(seed) {
       sister_agency: hub.sister_agency === true,
       confidence: hub.confidence || null,
       g7_notes: hub.g7_notes || null,
-      coi_sensitive: false,
       signal: null,
       date_added: null,
       source: 'seed',
@@ -102,7 +99,6 @@ export function buildGraphFromSeed(seed) {
         sister_agency: false,
         confidence: null,
         g7_notes: null,
-        coi_sensitive: !!adj.coi_sensitive,
         signal: null,
         date_added: null,
         source: 'seed',
@@ -112,8 +108,6 @@ export function buildGraphFromSeed(seed) {
         target: adjId,
         relationship: adj.relationship,
         note: adj.note || '',
-        coi_sensitive: !!adj.coi_sensitive,
-        coi_note: adj.coi_note || null,
       });
     }
   }
@@ -132,7 +126,6 @@ export function buildGraphFromSeed(seed) {
       sister_agency: parent.sister_agency === true,
       confidence: parent.confidence || null,
       g7_notes: parent.note ? { relationship_notes: parent.note } : null,
-      coi_sensitive: false,
       signal: null,
       date_added: null,
       source: 'seed',
@@ -145,13 +138,8 @@ export function buildGraphFromSeed(seed) {
         target: childId,
         relationship: 'parent_of',
         note: '',
-        coi_sensitive: false,
       });
     }
-  }
-
-  for (const analog of seed.structural_analogs || []) {
-    graph.structural_analogs.push({ pair: analog.pair, note: analog.note || '' });
   }
 
   graph.nodes = [...nodesById.values()];
@@ -170,10 +158,10 @@ const parseBool = (v) => TRUTHY.has(String(v || '').trim().toLowerCase());
  *
  * Nodes tab columns (locked header row, case-insensitive):
  *   id, name, type (hub|adjacent|parent), category, zone (experiential|talent|combo),
- *   parent, coi_sensitive, notes, signal_strength (0-1), signal_date (YYYY-MM-DD),
+ *   parent, notes, signal_strength (0-1), signal_date (YYYY-MM-DD),
  *   signal_type (signal_stacks|rfp), date_added, confidence
  * Relationships tab columns:
- *   source, target, relationship, note, coi_sensitive
+ *   source, target, relationship, note
  *
  * Propagation strength is computed algorithmically (scoring.js), not stored
  * per row.
@@ -207,7 +195,6 @@ export function buildGraphFromSheet(nodeRows, relRows) {
       sister_agency: parseBool(row.sister_agency),
       confidence: (row.confidence || '').trim() || null,
       g7_notes: (row.notes || '').trim() ? { relationship_notes: row.notes.trim() } : null,
-      coi_sensitive: parseBool(row.coi_sensitive),
       signal,
       date_added: (row.date_added || '').trim() || null,
       source: 'sheet',
@@ -220,10 +207,6 @@ export function buildGraphFromSheet(nodeRows, relRows) {
     const relationship = (row.relationship || '').trim().toLowerCase();
     if (!source || !target || !relationship) continue;
     if (!nodesById.has(source) || !nodesById.has(target)) continue;
-    if (relationship === 'structural_analog') {
-      graph.structural_analogs.push({ pair: [source, target], note: (row.note || '').trim() });
-      continue;
-    }
     if (relationship === 'parent_of') {
       const child = nodesById.get(target);
       if (child && !child.parent) child.parent = source;
@@ -233,7 +216,6 @@ export function buildGraphFromSheet(nodeRows, relRows) {
       target,
       relationship,
       note: (row.note || '').trim(),
-      coi_sensitive: parseBool(row.coi_sensitive),
     });
   }
 
@@ -249,7 +231,6 @@ export function buildGraphFromSheet(nodeRows, relRows) {
         target: node.id,
         relationship: 'parent_of',
         note: '',
-        coi_sensitive: false,
       });
     }
   }
