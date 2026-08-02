@@ -1,0 +1,491 @@
+/* II.3 stellar cartography: black canvas, white/gray glow model, per-map
+   accent for interaction feedback (set on :root by app.js). */
+:root {
+  --g7-purple: #3a1d6e;
+  --g7-purple-light: #e8e0f7;
+  --floor-gray: #4b4960; /* contrast pass: lifted so floor reads vs the bg */
+  --ring-signal: #2fd4b8; /* unified: Signal Stacks detection OR RFP event */
+  --ring-sister: #b83a1a; /* II.3 resolved: G7 red (was placeholder yellow) */
+  --hull: #8b7dd8;
+  --map-accent: #9a6cd3; /* business purple; app.js swaps to #ffd22e on Cultural */
+  --bg: #050508;
+  --panel-bg: #16132a;
+  --text: #e2ddf2;
+  --muted: #9a92b8;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+body { display: flex; flex-direction: column; }
+
+#toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 20px;
+  padding: 10px 16px;
+  background: var(--g7-purple);
+  color: #fff;
+  flex: 0 0 auto;
+}
+
+#brand { display: flex; align-items: baseline; gap: 8px; }
+#brand-mark {
+  font-weight: 800;
+  background: #fff;
+  color: var(--g7-purple);
+  border-radius: 6px;
+  padding: 2px 7px;
+}
+#brand-title { font-weight: 600; letter-spacing: 0.02em; }
+#source-badge {
+  font-size: 11px;
+  opacity: 0.75;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 10px;
+  padding: 1px 8px;
+}
+
+#lens-toggle, #filter-toggles, #map-toggle { display: flex; border-radius: 8px; overflow: hidden; }
+#filter-toggles { gap: 1px; }
+#lens-toggle button, #filter-toggles button, #map-toggle button {
+  border: none;
+  padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+}
+#lens-toggle button.active, #filter-toggles button.active { background: #fff; color: var(--g7-purple); font-weight: 600; }
+/* II.2 landscape toggle — the primary control, visually weightier. */
+#map-toggle { border: 1px solid rgba(255, 255, 255, 0.35); }
+#map-toggle button.active { background: #fff; color: var(--g7-purple); font-weight: 700; }
+
+#controls { margin-left: auto; display: flex; gap: 8px; }
+#search {
+  border: none;
+  border-radius: 8px;
+  padding: 6px 10px;
+  width: 220px;
+  font-size: 13px;
+}
+#reset-view {
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+}
+#reset-view:hover { background: rgba(255, 255, 255, 0.28); }
+/* Item 5: future manual-entry capability — visual placeholder only. */
+#add-entity {
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 13px;
+  cursor: not-allowed;
+}
+
+#stage { position: relative; flex: 1 1 auto; overflow: hidden; }
+#canvas { width: 100%; height: 100%; display: block; cursor: grab; }
+#canvas:active { cursor: grabbing; }
+
+/* ---- graph elements ---- */
+
+/* §5c: edges as faint luminous "trade routes". */
+.link { stroke: rgba(155, 140, 255, 0.22); stroke-width: 1.2px; }
+.link.parent_of { stroke: rgba(139, 125, 216, 0.5); stroke-width: 1.6px; stroke-dasharray: 2 3; }
+.link.analogous_audience { stroke-dasharray: 5 4; }
+
+/* §4f sector boundaries: faint grid lines with corner labels, no fills. */
+.sector-line { stroke: rgba(139, 125, 216, 0.16); stroke-width: 1; }
+.sector-label {
+  fill: rgba(154, 146, 184, 0.55);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+}
+
+/* §6a.1 orbital layout: dashed orbit path behind a parent's children. */
+.orbit-path {
+  fill: var(--hull);
+  fill-opacity: 0.05;
+  stroke: var(--hull);
+  stroke-opacity: 0.5;
+  stroke-width: 1.2;
+  stroke-dasharray: 6 6;
+}
+
+/* Cartographic well labels + II.6 signal vectors: per-map chrome, faded by
+   the active landscape. Cultural chrome shows on .cultural-active; business
+   chrome shows otherwise (business is the default map). */
+.cultural-chrome, .business-chrome {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.7s ease;
+}
+#canvas.cultural-active .cultural-chrome { opacity: 1; }
+#canvas:not(.cultural-active) .business-chrome { opacity: 1; }
+.well-label {
+  fill: rgba(255, 210, 46, 0.38); /* cultural: yellow accent */
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+}
+.well-label.active { fill: rgba(255, 210, 46, 0.95); }
+/* Step 6: business well labels in the business (purple) accent. */
+.well-label.business { fill: rgba(154, 108, 211, 0.4); }
+.signal-vector {
+  stroke: #ffd22e;
+  stroke-width: 2px;
+  stroke-linecap: round;
+}
+.signal-vector.dimmed { opacity: 0.06 !important; }
+
+/* Step 4: cloak competitor/adjacent nodes (and their links + ghosts) on the
+   Cultural Landscape — they have no cultural_verticals, so their position
+   there is meaningless leftover placement. Fully visible on Business. */
+#canvas.cultural-active .node.type-adjacent,
+#canvas.cultural-active .ghost.type-adjacent,
+#canvas.cultural-active .link.adjacent-link { display: none; }
+
+.node { cursor: pointer; }
+/* Contrast pass: a slightly stronger rim so even floor nodes separate from
+   the near-black background at rest. */
+.node circle.core { stroke: rgba(226, 221, 242, 0.34); stroke-width: 1px; }
+/* II.3 base glow model — fills/glow intensities are applied per-node by
+   applyGlow() in app.js (signal-age and well-isolation scaling need inline
+   values); these classes carry the constant parts. */
+.node circle.core.glow-client {
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.85))
+    drop-shadow(0 0 16px rgba(235, 235, 255, 0.4));
+}
+.node circle.core.glow-floor { opacity: 0.72; }
+/* II.3 selection accent: the map's identity color lives in interaction
+   feedback, not the base palette. */
+.node.selected circle.core {
+  stroke: var(--map-accent);
+  stroke-width: 2.5px;
+  filter: drop-shadow(0 0 7px var(--map-accent)) !important;
+}
+
+.ring { fill: none; stroke-width: 2.5px; }
+.ring.signal { stroke: var(--ring-signal); }
+.ring.sister { stroke: var(--ring-sister); }
+
+/* §9/§11: new additions pulse brighter for their first week — replaces the
+   old red new-addition ring entirely. */
+@keyframes new-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 5px rgba(235, 235, 250, 0.7))
+      drop-shadow(0 0 12px rgba(215, 215, 240, 0.4));
+  }
+  50% {
+    filter: drop-shadow(0 0 9px rgba(255, 255, 255, 1))
+      drop-shadow(0 0 24px rgba(240, 240, 255, 0.8));
+  }
+}
+.node circle.core.new-pulse { animation: new-pulse 2.6s ease-in-out infinite; }
+
+/* Zoom-conditional ring labels: only past the zoom threshold (Section 9 note). */
+.ring-label {
+  font-size: 3.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  display: none;
+}
+.zoomed-in .ring-label { display: block; }
+.ring-label.signal { fill: var(--ring-signal); }
+.ring-label.sister { fill: var(--ring-sister); }
+
+/* §5d typography hierarchy: G7's own roster (hubs/parents) reads prominent;
+   competitor/adjacent entities are permanently subordinate — reinforcing the
+   same hierarchy as the purple-vs-gray fill (§5a) and glow (§5b/§5c). */
+.node-label {
+  font-size: 12px;
+  font-weight: 600;
+  fill: #d6d0e8;
+  paint-order: stroke;
+  stroke: rgba(13, 11, 26, 0.9);
+  stroke-width: 3px;
+  pointer-events: none;
+}
+.node-label.adjacent-label { font-size: 7.5px; font-weight: 400; fill: #8f87ad; }
+.zoomed-out .adjacent-label { display: none; }
+/* §4g competitor-dim: labels fully hidden, not faded. */
+.competitors-hidden .adjacent-label { display: none !important; }
+
+/* Lens dimming: switched-off, not removed (Section 4). */
+.dimmed { opacity: 0.1; filter: grayscale(0.85); transition: opacity 0.25s; }
+
+/* §4h selection: connected edges glow, everything else recedes. Business
+   keeps the lighter recede; Cultural (Step 5) dims near-invisible so a
+   selected node's real cultural neighborhood stands almost alone. */
+.has-selection .link:not(.connected):not(.dimmed) { opacity: 0.12; }
+.has-selection .node:not(.selected):not(.neighbor):not(.dimmed) { opacity: 0.3; }
+#canvas.cultural-active .has-selection .link:not(.connected):not(.dimmed) { opacity: 0.03; }
+#canvas.cultural-active .has-selection .node:not(.selected):not(.neighbor):not(.dimmed) { opacity: 0.05; }
+.link.connected {
+  stroke: var(--map-accent); /* II.3: selection feedback carries the map's color */
+  stroke-width: 2px;
+  opacity: 1;
+}
+
+/* ---- II.3 gravity-well isolation rail (Cultural Landscape only) ---- */
+
+#well-rail {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  max-width: 80%;
+  background: rgba(22, 19, 42, 0.9);
+  border: 1px solid rgba(139, 125, 216, 0.25);
+  border-radius: 10px;
+  padding: 8px 10px;
+  z-index: 5;
+}
+#well-rail.hidden { display: none; }
+#well-rail button {
+  border: 1px solid rgba(255, 210, 46, 0.25);
+  border-radius: 7px;
+  background: rgba(255, 210, 46, 0.07);
+  color: #d8cfa8;
+  font-size: 11px;
+  padding: 4px 9px;
+  cursor: pointer;
+}
+#well-rail button:hover { background: rgba(255, 210, 46, 0.18); }
+#well-rail button.active {
+  background: #ffd22e;
+  color: #221c04;
+  font-weight: 700;
+  border-color: #ffd22e;
+}
+#well-rail button.well-clear { border-style: dashed; color: var(--muted); }
+
+/* ---- panel ---- */
+
+#detail-panel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 340px;
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
+  background: var(--panel-bg);
+  border: 1px solid rgba(139, 125, 216, 0.25);
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.55);
+  padding: 16px 18px;
+}
+#detail-panel.hidden { display: none; }
+#panel-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  border: none;
+  background: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--muted);
+}
+#panel-content h2 { margin: 0 40px 2px 0; font-size: 17px; }
+#panel-content .subtitle { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+#panel-content h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin: 14px 0 4px;
+}
+#panel-content p, #panel-content li { font-size: 13px; line-height: 1.45; margin: 4px 0; }
+#panel-content ul { margin: 4px 0; padding-left: 18px; }
+.badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 1px 7px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.badge.zone { background: #2c2350; color: #cdbdf5; }
+.badge.client { background: #6a48b8; color: #fff; }
+.badge.signal { background: #123c34; color: #4ee0c2; }
+.badge.rfp { background: #45280f; color: #ffb26e; }
+.badge.sister { background: #4a3c10; color: #f2d24b; }
+.rel-note { color: var(--muted); font-size: 12px; }
+/* §6c Generate Competitors */
+#gen-competitors {
+  background: #6a48b8;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+}
+#gen-competitors:hover:not(:disabled) { background: #7d5ccc; }
+#gen-competitors:disabled { opacity: 0.5; cursor: default; }
+@keyframes searching-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+#gen-status.searching { animation: searching-pulse 1.1s ease-in-out infinite; }
+#gen-status.searching::after { content: '…'; }
+
+.relevance-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: #262040;
+  overflow: hidden;
+  margin: 4px 0 2px;
+}
+.relevance-bar > div { height: 100%; background: #a886ff; }
+
+/* Step 7 radar — spike burst (independent triangular spikes, no polygon). */
+.radar { width: 100%; height: auto; display: block; margin: 6px 0 2px; }
+.radar-ring { fill: none; stroke: rgba(139, 125, 216, 0.14); stroke-width: 1; }
+.radar-axis { stroke: rgba(139, 125, 216, 0.18); stroke-width: 1; }
+.radar-spike { fill: rgba(255, 210, 46, 0.7); stroke: #ffd22e; stroke-width: 0.75; }
+.radar-axis-label { fill: var(--muted); font-size: 8.5px; letter-spacing: 0.02em; }
+
+/* Step 7 accordion — one collapsible row per cultural well. */
+.accordion { margin: 4px 0; }
+.cult-row { border-bottom: 1px solid rgba(139, 125, 216, 0.14); }
+.cult-row > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 2px;
+  font-size: 13px;
+}
+.cult-row > summary::-webkit-details-marker { display: none; }
+.cult-row > summary::before { content: '▸'; color: var(--muted); margin-right: 6px; font-size: 10px; }
+.cult-row[open] > summary::before { content: '▾'; }
+.cult-name { flex: 1; }
+.cult-score { color: var(--g7-purple-light); font-weight: 700; font-variant-numeric: tabular-nums; }
+.rubric { padding: 2px 2px 8px 18px; }
+.rubric-row { display: flex; justify-content: space-between; font-size: 12px; margin: 3px 0; color: var(--text); }
+.rubric-row .pending {
+  color: var(--muted);
+  font-style: italic;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* II.14 ghost mode — dim duplicate at prior position + fading connector. */
+.ghost-node { fill: rgba(154, 146, 184, 0.28); stroke: none; }
+.ghost-link { stroke: rgba(154, 146, 184, 0.3); stroke-width: 1; stroke-dasharray: 3 4; }
+
+/* ---- legend & status ---- */
+
+#legend {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  background: rgba(22, 19, 42, 0.92);
+  border: 1px solid rgba(139, 125, 216, 0.2);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 11.5px;
+  color: var(--muted);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+}
+.legend-row { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+.swatch { width: 14px; height: 14px; border-radius: 50%; flex: 0 0 auto; }
+.swatch.gradient { background: linear-gradient(90deg, rgba(150, 150, 165, 0.15), #b9b9cc); border-radius: 4px; }
+.swatch.client { background: #f5f3ff; box-shadow: 0 0 7px rgba(255, 255, 255, 0.8); }
+.swatch.floor { background: var(--floor-gray); }
+.swatch.ring { background: #fff; border: 2.5px solid; }
+.swatch.ring-signal { border-color: var(--ring-signal); }
+.swatch.ring-sister { border-color: var(--ring-sister); }
+.swatch.pulse {
+  background: radial-gradient(circle, #e6d6ff 0%, #a886ff 45%, transparent 75%);
+  animation: new-pulse 2.6s ease-in-out infinite;
+}
+.swatch.orbit { background: rgba(106, 76, 147, 0.06); border: 1.5px dashed var(--hull); }
+.swatch.vector {
+  border-radius: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #ffd22e 70%, transparent 70%);
+  position: relative;
+}
+.swatch.vector::after {
+  content: '';
+  position: absolute;
+  right: 1px;
+  top: -3px;
+  border-left: 6px solid #ffd22e;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+}
+
+#status {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(22, 19, 42, 0.92);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+#status.hidden { display: none; }
+
+/* ---- review page ---- */
+
+/* The review page opts out of the §5c dark theme — it's a form, not a chart. */
+.review-body { padding: 24px; max-width: 900px; margin: 0 auto; display: block; background: #faf9fc; color: #241b35; }
+.review-body a { color: #3a1d6e; }
+.review-body h1 { font-size: 20px; }
+.review-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(36, 27, 53, 0.1);
+  padding: 16px 20px;
+  margin: 14px 0;
+}
+.review-card table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.review-card th, .review-card td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eee; vertical-align: top; }
+.review-body input[type="text"], .review-body input[type="password"], .review-body textarea, .review-body select {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #d5cee6;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  margin: 4px 0 10px;
+}
+.review-body textarea { min-height: 160px; }
+.review-body button.primary {
+  background: var(--g7-purple);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.review-body button.primary:disabled { opacity: 0.5; }
+.review-msg { font-size: 13px; color: var(--muted); white-space: pre-wrap; }

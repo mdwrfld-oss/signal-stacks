@@ -8,6 +8,12 @@
       "port": 8790
     },
     {
+      "name": "pages-static",
+      "runtimeExecutable": "/Users/Matt.Weiner/.nvm/versions/node/v22.23.1/bin/node",
+      "runtimeArgs": ["cluster-study/scripts/static-server.mjs", "8791", "docs"],
+      "port": 8791
+    },
+    {
       "name": "cluster-study",
       "runtimeExecutable": "/Users/Matt.Weiner/.nvm/versions/node/v22.23.1/bin/node",
       "runtimeArgs": [
