@@ -3,7 +3,7 @@
 :root {
   --g7-purple: #3a1d6e;
   --g7-purple-light: #e8e0f7;
-  --floor-gray: #2c2a38;
+  --floor-gray: #4b4960; /* contrast pass: lifted so floor reads vs the bg */
   --ring-signal: #2fd4b8; /* unified: Signal Stacks detection OR RFP event */
   --ring-sister: #b83a1a; /* II.3 resolved: G7 red (was placeholder yellow) */
   --hull: #8b7dd8;
@@ -87,6 +87,16 @@ body { display: flex; flex-direction: column; }
   font-size: 13px;
 }
 #reset-view:hover { background: rgba(255, 255, 255, 0.28); }
+/* Item 5: future manual-entry capability — visual placeholder only. */
+#add-entity {
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 13px;
+  cursor: not-allowed;
+}
 
 #stage { position: relative; flex: 1 1 auto; overflow: hidden; }
 #canvas { width: 100%; height: 100%; display: block; cursor: grab; }
@@ -152,7 +162,9 @@ body { display: flex; flex-direction: column; }
 #canvas.cultural-active .link.adjacent-link { display: none; }
 
 .node { cursor: pointer; }
-.node circle.core { stroke: rgba(226, 221, 242, 0.22); stroke-width: 1px; }
+/* Contrast pass: a slightly stronger rim so even floor nodes separate from
+   the near-black background at rest. */
+.node circle.core { stroke: rgba(226, 221, 242, 0.34); stroke-width: 1px; }
 /* II.3 base glow model — fills/glow intensities are applied per-node by
    applyGlow() in app.js (signal-age and well-isolation scaling need inline
    values); these classes carry the constant parts. */
@@ -160,7 +172,7 @@ body { display: flex; flex-direction: column; }
   filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.85))
     drop-shadow(0 0 16px rgba(235, 235, 255, 0.4));
 }
-.node circle.core.glow-floor { opacity: 0.55; }
+.node circle.core.glow-floor { opacity: 0.72; }
 /* II.3 selection accent: the map's identity color lives in interaction
    feedback, not the base palette. */
 .node.selected circle.core {

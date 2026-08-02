@@ -57,12 +57,17 @@ const RING_GAP = 4;
  * node between them. This replaces Part I §4f's sector grid/force entirely.
  */
 const MAP_TRANSITION_MS = 1100;
+// Cluster breathing room (spacing pass): since scored hubs/parents are PINNED
+// to their anchor-weighted positions, the distance BETWEEN clusters is set by
+// the anchor geometry, not by repulsion — node/label sizes are fixed, so
+// scaling the wells apart (then letting fit-to-view re-normalize) is what buys
+// real whitespace between families and standalone hubs. Bumped ~20% this pass.
 // Business wells: 3×3 grid of anchor points (9 verticals).
-const BIZ_COL_STEP = 720;
-const BIZ_ROW_STEP = 620;
+const BIZ_COL_STEP = 800;
+const BIZ_ROW_STEP = 680;
 // Cultural wells: 13 anchor points on an ellipse.
-const CULT_RX = 900;
-const CULT_RY = 640;
+const CULT_RX = 990;
+const CULT_RY = 700;
 // Cultural spacing: raw proportional weights collapse everyone toward the
 // ellipse centroid (every entity carries some score in most of the 13 wells).
 // Sharpening the weights (score^gamma before normalizing) makes a 5 pull
@@ -336,7 +341,7 @@ function render(graph) {
   /* Step 6: business well labels — same faint cartographic treatment on the
      3×3 grid of business anchors. Pushed radially outward from grid center so
      each label sits just beyond its cluster (the center well nudges up). */
-  const BIZ_LABEL_OFFSET = 150;
+  const BIZ_LABEL_OFFSET = 110;
   const businessLabelPoints = BUSINESS_VERTICALS.map((v) => {
     const a = businessAnchors.get(v.id);
     const dx = a.x - cx;
@@ -382,8 +387,8 @@ function render(graph) {
       d3
         .forceLink(layoutLinks)
         .id((d) => d.id)
-        // §4e spacing distances retained for satellite placement.
-        .distance((d) => (d.relationship === 'direct_competitor' ? 90 : 130))
+        // Spacing pass: satellites (adjacents) sit further off their hubs.
+        .distance((d) => (d.relationship === 'direct_competitor' ? 108 : 156))
         .strength((d) =>
           // parent_of endpoints are both pinned semantically (positions /
           // centroids) — zero the spring so it can't fight the pins.
@@ -392,10 +397,10 @@ function render(graph) {
     )
     .force(
       'charge',
-      // §4e spacing: repulsion values carried over.
-      d3.forceManyBody().strength((d) => (d.type === 'hub' ? -520 : d.type === 'parent' ? -450 : -140))
+      // Spacing pass: stronger repulsion so satellites fan out around a hub.
+      d3.forceManyBody().strength((d) => (d.type === 'hub' ? -660 : d.type === 'parent' ? -580 : -180))
     )
-    .force('collide', d3.forceCollide((d) => d.r + 8))
+    .force('collide', d3.forceCollide((d) => d.r + 13))
     .force('labelCollide', forceLabelCollide())
     // Weak containment only — placement comes from semantic pins (scored
     // nodes) and links (satellites), not from any regional force (§4f gone).
@@ -456,7 +461,9 @@ function render(graph) {
       const count = seen.get(key) || 0;
       if (count > 0) {
         const a = count * 2.399963;
-        const r = 34 * Math.sqrt(count);
+        // Spacing pass: wider fan so co-located same-profile hubs (a "cluster"
+        // of standalone hubs sharing a dominant well) read as distinct.
+        const r = 46 * Math.sqrt(count);
         n.x = n.fx = n.fx + r * Math.cos(a);
         n.y = n.fy = n.fy + r * Math.sin(a);
       }
@@ -627,14 +634,17 @@ function render(graph) {
         return;
       }
       c.style('opacity', null);
-      // Step 3: read the resolved glow triple (parents aggregate children).
+      // Step 3 / contrast pass: read the resolved glow triple (parents
+      // aggregate children). Fills form a clear luminance ladder against the
+      // near-black bg — client near-white, signaled a distinctly brighter
+      // gray than floor (with a floor of presence even at low relevance).
       if (d.glowClient) {
-        c.style('fill', '#f5f3ff').style('filter', null).classed('glow-client', true);
+        c.style('fill', '#f6f4ff').style('filter', null).classed('glow-client', true);
       } else if (!d.glowFloor) {
-        const a = 0.25 + 0.6 * Math.min(1, d.glowRelevance);
-        c.style('fill', '#8f8fa3').style(
+        const a = 0.4 + 0.5 * Math.min(1, d.glowRelevance);
+        c.style('fill', '#b3b1c9').style(
           'filter',
-          `drop-shadow(0 0 5px rgba(205,205,220,${a})) drop-shadow(0 0 12px rgba(180,180,205,${a * 0.6}))`
+          `drop-shadow(0 0 5px rgba(210,210,228,${a})) drop-shadow(0 0 12px rgba(185,185,212,${a * 0.6}))`
         );
       } else {
         c.style('fill', 'var(--floor-gray)').style('filter', null).classed('glow-floor', true);
