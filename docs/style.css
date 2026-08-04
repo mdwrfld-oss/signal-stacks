@@ -145,14 +145,24 @@ body { display: flex; flex-direction: column; }
   letter-spacing: 0.22em;
 }
 .well-label.active { fill: rgba(255, 210, 46, 0.95); }
-/* Step 6: business well labels in the business (purple) accent. */
-.well-label.business { fill: rgba(154, 108, 211, 0.4); }
+/* Item 5: business well labels in the business (purple) accent — brightened. */
+.well-label.business { fill: rgba(183, 152, 230, 0.78); }
 .signal-vector {
   stroke: #ffd22e;
   stroke-width: 2px;
   stroke-linecap: round;
 }
 .signal-vector.dimmed { opacity: 0.06 !important; }
+
+/* Items 5/6: sector-divider rays from map center to each well — faint grid
+   lines (per-map, faded via chrome), not solid fills. */
+.sector-divider { stroke: rgba(139, 125, 216, 0.16); stroke-width: 1; }
+.divider-layer.cultural-chrome .sector-divider { stroke: rgba(255, 210, 46, 0.12); }
+
+/* Item 7: cultural isolation wedge — a faint slice over the isolated well's
+   sector, additive to the per-node score glow (§II.13). Red family, matching
+   the isolation glow. */
+.isolation-wedge { fill: rgba(184, 58, 26, 0.11); stroke: none; pointer-events: none; }
 
 /* Step 4: cloak competitor/adjacent nodes (and their links + ghosts) on the
    Cultural Landscape — they have no cultural_verticals, so their position
@@ -173,6 +183,16 @@ body { display: flex; flex-direction: column; }
     drop-shadow(0 0 16px rgba(235, 235, 255, 0.4));
 }
 .node circle.core.glow-floor { opacity: 0.72; }
+/* Items 2/11: parents are backgrounded structure — white, faded, larger
+   (radius set in app.js), with only a soft halo. */
+.node circle.core.glow-parent {
+  opacity: 0.42;
+  filter: drop-shadow(0 0 8px rgba(245, 243, 255, 0.4));
+}
+/* Item 3: on the Business Landscape, competitors start well below the floor
+   baseline; selecting their connected hub brightens them (neighbor state). */
+#canvas:not(.cultural-active) .node.type-adjacent circle.core.glow-floor { opacity: 0.36; }
+#canvas:not(.cultural-active) .node.neighbor.type-adjacent circle.core.glow-floor { opacity: 0.95; }
 /* II.3 selection accent: the map's identity color lives in interaction
    feedback, not the base palette. */
 .node.selected circle.core {
@@ -224,6 +244,9 @@ body { display: flex; flex-direction: column; }
 }
 .node-label.adjacent-label { font-size: 7.5px; font-weight: 400; fill: #8f87ad; }
 .zoomed-out .adjacent-label { display: none; }
+/* Item 11: parent labels fade with the backgrounded parent node, but stay a
+   good deal more legible than the node's own 0.42 fade. */
+.node-label.parent-label { fill: #a89ec4; opacity: 0.78; }
 /* §4g competitor-dim: labels fully hidden, not faded. */
 .competitors-hidden .adjacent-label { display: none !important; }
 
@@ -245,16 +268,17 @@ body { display: flex; flex-direction: column; }
 
 /* ---- II.3 gravity-well isolation rail (Cultural Landscape only) ---- */
 
+/* Item 8: rail moved from top to the bottom band, alongside the legend. */
 #well-rail {
   position: absolute;
-  top: 12px;
+  bottom: 14px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 6px;
-  max-width: 80%;
+  max-width: 62%;
   background: rgba(22, 19, 42, 0.9);
   border: 1px solid rgba(139, 125, 216, 0.25);
   border-radius: 10px;
@@ -332,6 +356,19 @@ body { display: flex; flex-direction: column; }
 .badge.rfp { background: #45280f; color: #ffb26e; }
 .badge.sister { background: #4a3c10; color: #f2d24b; }
 .rel-note { color: var(--muted); font-size: 12px; }
+/* Item 4: future manual-entry placeholder — a real-looking, inert input. */
+.add-competitor-input {
+  width: 100%;
+  padding: 7px 10px;
+  margin: 2px 0 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(139, 125, 216, 0.3);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+}
+.add-competitor-input::placeholder { color: var(--muted); }
 /* §6c Generate Competitors */
 #gen-competitors {
   background: #6a48b8;

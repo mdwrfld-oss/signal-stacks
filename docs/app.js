@@ -44,8 +44,9 @@ const RING_LABEL_ZOOM = 2.2; // rings separate + labels become viable past here
 const ADJ_LABEL_ZOOM = 0.85;
 
 // §6a.1: parents render visibly larger than hubs — they're organizing
-// structure, not peer nodes.
-const RADII = { hub: 16, parent: 24, adjacent: 8 };
+// structure, not peer nodes. Items 2/11: enlarged further and faded (see
+// applyGlow's glow-parent) so they read as backgrounded structure.
+const RADII = { hub: 16, parent: 36, adjacent: 8 };
 const RING_GAP = 4;
 
 /*
@@ -99,13 +100,18 @@ const state = {
   neighborHubs: new Map(), // adjacent/parent id -> Set(hub ids) for lens membership
 };
 
-/* II.3 color model: the purple fill gradient is gone. Base state — clients
- * glow white, signaled non-clients glow gray fading with signal age, floor
- * nodes are dim placeholders (open design question; deliberately unpolished).
- * The map's identity color lives ONLY in interaction feedback (--map-accent:
- * business purple / cultural yellow) and well isolation. */
+/* Color model (presentation pass): each map has an IDENTITY color that now
+ * doubles as the client base fill — business purple, cultural yellow. Clients
+ * render in that color (with a colored glow); signal-derived non-clients stay
+ * plain white; parents are backgrounded white; floor nodes are dim. The same
+ * accent still drives selection feedback. */
 const MAP_ACCENT = { business: '#9a6cd3', cultural: '#ffd22e' };
-const isolationFill = d3.interpolateRgb('#211e15', '#ffd22e');
+// Item 10: well-isolation glow scales in RED now, since yellow is claimed by
+// cultural client identity (#B83A1A = the sister-agency ring red, reused so
+// the isolation lens and that ring share one "not-yellow" family).
+const ISOLATION_COLOR = '#B83A1A';
+const ISOLATION_RGB = '184,58,26';
+const isolationFill = d3.interpolateRgb('#1a0d0a', ISOLATION_COLOR);
 
 // §5c idle drift (resolves open question 4b in favor of "yes, drift"):
 // stars drift gently at rest. Purely visual — the offset is applied to the
@@ -289,6 +295,11 @@ function render(graph) {
   }
 
   const viewport = svg.append('g').attr('id', 'viewport').attr('class', 'zoomed-out');
+  // Items 5/6: faint sector-divider lines radiating from map center to each
+  // well, and (item 7) the cultural isolation wedge — behind everything.
+  const businessDividerLayer = viewport.append('g').attr('class', 'divider-layer business-chrome');
+  const culturalDividerLayer = viewport.append('g').attr('class', 'divider-layer cultural-chrome');
+  const wedgeLayer = viewport.append('g').attr('class', 'wedge-layer cultural-chrome');
   // Cartographic well labels — one layer per map, each faded by the active
   // landscape (cultural on .cultural-active, business otherwise).
   const culturalLabelLayer = viewport.append('g').attr('class', 'well-label-layer cultural-chrome');
@@ -360,6 +371,54 @@ function render(graph) {
     .attr('x', (d) => d.x)
     .attr('y', (d) => d.y)
     .text((d) => d.label.toUpperCase());
+
+  /* Items 5/6: sector-divider lines — one faint ray from map center out to
+     each well anchor (business grid + cultural ellipse). Skips the business
+     center well, whose anchor sits on the center point. */
+  const dividerEnd = (a) => {
+    const dx = a.x - cx;
+    const dy = a.y - cy;
+    const len = Math.hypot(dx, dy);
+    if (len < 1) return null; // center well: no ray
+    // Extend a touch past the anchor so rays reach toward the labels.
+    const ext = (len + 70) / len;
+    return { x: cx + dx * ext, y: cy + dy * ext };
+  };
+  const drawDividers = (layer, anchors) =>
+    layer
+      .selectAll('line')
+      .data([...anchors.values()].map(dividerEnd).filter(Boolean))
+      .join('line')
+      .attr('class', 'sector-divider')
+      .attr('x1', cx)
+      .attr('y1', cy)
+      .attr('x2', (d) => d.x)
+      .attr('y2', (d) => d.y);
+  drawDividers(businessDividerLayer, businessAnchors);
+  drawDividers(culturalDividerLayer, culturalAnchors);
+
+  /* Item 7: cultural isolation wedge — a faint filled slice over the isolated
+     well's angular sector, an orientation cue additive to the per-node score
+     glow (§II.13). Built once; shown/hidden by setIsolatedWell. */
+  const wedgePath = wedgeLayer.append('path').attr('class', 'isolation-wedge').style('display', 'none');
+  function wedgeFor(wellId) {
+    const i = CULTURAL_VERTICALS.findIndex((v) => v.id === wellId);
+    if (i < 0) return null;
+    const center = (i / CULTURAL_VERTICALS.length) * 2 * Math.PI - Math.PI / 2;
+    const half = Math.PI / CULTURAL_VERTICALS.length;
+    const reach = 0.95; // out toward the well anchor, staying inside the fit
+    const pts = [];
+    for (let t = 0; t <= 12; t++) {
+      const a = center - half + (2 * half * t) / 12;
+      pts.push(`${(cx + CULT_RX * reach * Math.cos(a)).toFixed(1)},${(cy + CULT_RY * reach * Math.sin(a)).toFixed(1)}`);
+    }
+    return `M${cx},${cy} L${pts.join(' L')} Z`;
+  }
+  function updateWedge() {
+    const w = state.map === 'cultural' ? state.isolatedWell : null;
+    if (!w) return wedgePath.style('display', 'none');
+    wedgePath.attr('d', wedgeFor(w)).style('display', null);
+  }
 
   /* II.6 arrowhead marker (cultural accent — vectors only render there). */
   svg
@@ -620,33 +679,49 @@ function render(graph) {
     const well = state.map === 'cultural' ? state.isolatedWell : null;
     node.select('circle.core').each(function (d) {
       const c = d3.select(this);
-      c.classed('glow-client', false).classed('glow-floor', false);
+      c.classed('glow-client', false).classed('glow-floor', false).classed('glow-parent', false);
       if (well) {
+        // Item 10: score-scaled isolation glow in RED (§II.13 mechanic intact,
+        // only the color family changed from yellow to #B83A1A).
         const s = (d.cultural_verticals?.[well] || 0) / 5;
         c.style('fill', isolationFill(s))
           .style('opacity', 0.3 + 0.7 * s)
           .style(
             'filter',
             s > 0.02
-              ? `drop-shadow(0 0 ${4 + 9 * s}px rgba(255,210,46,${0.2 + 0.75 * s}))`
+              ? `drop-shadow(0 0 ${4 + 9 * s}px rgba(${ISOLATION_RGB},${0.2 + 0.75 * s}))`
               : 'none'
           );
         return;
       }
       c.style('opacity', null);
-      // Step 3 / contrast pass: read the resolved glow triple (parents
-      // aggregate children). Fills form a clear luminance ladder against the
-      // near-black bg — client near-white, signaled a distinctly brighter
-      // gray than floor (with a floor of presence even at low relevance).
-      if (d.glowClient) {
-        c.style('fill', '#f6f4ff').style('filter', null).classed('glow-client', true);
+      // Presentation pass. Order matters: parents are backgrounded structure
+      // (white + faded) even though they aggregate client children, so the
+      // parent case wins over glowClient.
+      if (d.type === 'parent') {
+        // Items 2/11: white, faded, larger (radius set at creation).
+        c.style('fill', '#f6f4ff').style('filter', null).classed('glow-parent', true);
+      } else if (d.glowClient) {
+        // Items 1/9: client identity color per map, with a colored glow.
+        //   business → purple base + white glow halo (layered, not replaced)
+        //   cultural → yellow base + yellow glow
+        c.style('fill', MAP_ACCENT[state.map]);
+        if (state.map === 'cultural') {
+          c.style('filter', 'drop-shadow(0 0 6px rgba(255,210,46,0.9)) drop-shadow(0 0 16px rgba(255,210,46,0.45))');
+        } else {
+          c.style('filter', null).classed('glow-client', true); // white halo via CSS class
+        }
       } else if (!d.glowFloor) {
-        const a = 0.4 + 0.5 * Math.min(1, d.glowRelevance);
-        c.style('fill', '#b3b1c9').style(
+        // Signal-derived non-clients (Ulta, Reddit, Stella, PLL): plain white
+        // glow on both maps (items 1 & 9).
+        const a = 0.5 + 0.45 * Math.min(1, d.glowRelevance);
+        c.style('fill', '#f6f4ff').style(
           'filter',
-          `drop-shadow(0 0 5px rgba(210,210,228,${a})) drop-shadow(0 0 12px rgba(185,185,212,${a * 0.6}))`
+          `drop-shadow(0 0 5px rgba(255,255,255,${a})) drop-shadow(0 0 13px rgba(235,235,255,${a * 0.6}))`
         );
       } else {
+        // Floor / competitors: dim placeholder (business dims these further +
+        // brightens on hub selection via CSS — item 3).
         c.style('fill', 'var(--floor-gray)').style('filter', null).classed('glow-floor', true);
       }
     });
@@ -675,6 +750,7 @@ function render(graph) {
       b.classList.toggle('active', b.dataset.well === wellId)
     );
     wellLabels.classed('active', (d) => d.id === wellId);
+    updateWedge(); // item 7
     applyGlow();
   }
   rail.addEventListener('click', (e) => {
@@ -712,7 +788,8 @@ function render(graph) {
 
   node
     .append('text')
-    .attr('class', (d) => `node-label${d.type === 'adjacent' ? ' adjacent-label' : ''}`)
+    // Item 11: parent labels fade too, but stay more legible than the node.
+    .attr('class', (d) => `node-label${d.type === 'adjacent' ? ' adjacent-label' : d.type === 'parent' ? ' parent-label' : ''}`)
     .attr('text-anchor', 'middle')
     .attr('y', (d) => d.r + RING_GAP * d.rings.length + 12)
     .text((d) => d.name);
@@ -1208,6 +1285,17 @@ function showPanel(d) {
       }
       parts.push('</ul>');
     }
+  }
+
+  /* Item 4: "+ Add competitor" placeholder. FUTURE WORK — non-functional text
+     entry only; no submit handler, no backend. Manual competitor entry lands
+     here later (parallel to §6c Generate Competitors). Hubs/parents only. */
+  if (d.type === 'hub' || d.type === 'parent') {
+    // No submit handler is wired ON PURPOSE — this is a placeholder for the
+    // future manual-entry path; typing does nothing until the backend exists.
+    parts.push(
+      '<h3>Add competitor</h3><input type="text" class="add-competitor-input" placeholder="Add competitor name…" aria-label="Add competitor name (coming soon)" title="Manual competitor entry — coming soon" />'
+    );
   }
 
   /* talent history (Section 10.4) — gated on the Backbone Sheet talent_name field */
