@@ -4,7 +4,7 @@
   --g7-purple: #3a1d6e;
   --g7-purple-light: #e8e0f7;
   --floor-gray: #4b4960; /* contrast pass: lifted so floor reads vs the bg */
-  --ring-signal: #2fd4b8; /* unified: Signal Stacks detection OR RFP event */
+  --ring-signal: #ffffff; /* Fix 2: white — clean accent on any node fill (was teal) */
   --ring-sister: #b83a1a; /* II.3 resolved: G7 red (was placeholder yellow) */
   --hull: #8b7dd8;
   --map-accent: #9a6cd3; /* business purple; app.js swaps to #ffd22e on Cultural */
@@ -202,7 +202,10 @@ body { display: flex; flex-direction: column; }
 }
 
 .ring { fill: none; stroke-width: 2.5px; }
-.ring.signal { stroke: var(--ring-signal); }
+/* Fix 2: white signal ring reads as a clean accent on white / purple / yellow
+   node fills alike — a thin dark separation keeps it legible even over the
+   white glow of a signal-derived non-client. */
+.ring.signal { stroke: var(--ring-signal); filter: drop-shadow(0 0 1.4px rgba(0, 0, 0, 0.75)); }
 .ring.sister { stroke: var(--ring-sister); }
 
 /* §9/§11: new additions pulse brighter for their first week — replaces the
@@ -268,23 +271,26 @@ body { display: flex; flex-direction: column; }
 
 /* ---- II.3 gravity-well isolation rail (Cultural Landscape only) ---- */
 
-/* Item 8: rail moved from top to the bottom band, alongside the legend. */
+/* Fix 1: the bottom splits into two halves — legend fixed on the left,
+   well-rail filling the right half. The 13 wells + Clear reflow and justify
+   across the available width instead of a left-cramped centered stack. */
 #well-rail {
   position: absolute;
   bottom: 14px;
   left: 50%;
-  transform: translateX(-50%);
+  right: 12px;
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
-  max-width: 62%;
+  justify-content: space-between;
+  align-content: flex-end;
+  gap: 7px;
   background: rgba(22, 19, 42, 0.9);
   border: 1px solid rgba(139, 125, 216, 0.25);
   border-radius: 10px;
-  padding: 8px 10px;
+  padding: 9px 12px;
   z-index: 5;
 }
+#well-rail button { flex: 1 0 auto; text-align: center; }
 #well-rail.hidden { display: none; }
 #well-rail button {
   border: 1px solid rgba(255, 210, 46, 0.25);
@@ -441,6 +447,7 @@ body { display: flex; flex-direction: column; }
   position: absolute;
   left: 12px;
   bottom: 12px;
+  max-width: calc(50% - 24px); /* Fix 1: stay in the left half, clear of the rail */
   background: rgba(22, 19, 42, 0.92);
   border: 1px solid rgba(139, 125, 216, 0.2);
   border-radius: 10px;

@@ -30,7 +30,7 @@
     ],
     "vertical_notes": "RESOLVED 2026-07-11 (Part II, II.10 open question #1): the original 6 verticals were single-assignment categorical labels; the single 'vertical' field on each hub node has been removed and replaced with a 'business_verticals' object (0-5 weighted score per well, mirroring 'cultural_verticals'). Expanded from 6 to 9 wells this pass -- added beauty_retail and media_social_platforms to accommodate signal-sourced entities (Ulta Beauty, Reddit) that didn't fit the original 6, and added entertainment per the plan doc's own Liquid Death hybrid-brand example (Part II, II.1). cpgs and sports, previously empty, now have partial coverage (Mojo Energy Pouches scores 4 on cpgs; PLL scores 5 on sports) -- still worth broadening with future roster additions.",
     "ring_types": {
-      "signal": "teal — unified ring for Signal Stacks detection and RFP-sourced events (v1 build only; re-evaluate under Map Engine v2's white/gray glow model)",
+      "signal": "white — unified ring for Signal Stacks detection and RFP-sourced events; reads as a clean accent on any node fill (updated from teal 2026-08-03)",
       "sister_agency": "#B83A1A (G7 red) — Project Worldwide sister-agency relationship"
     },
     "new_addition_treatment": "pulsing glow (brighter + slow pulse) for first week, not a separate ring type",
