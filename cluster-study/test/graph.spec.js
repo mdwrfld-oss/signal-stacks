@@ -200,16 +200,15 @@ describe('familySteps', () => {
 });
 
 describe('rings (simplified two-ring model, §9 revision + §5a.1)', () => {
-  it('gives ANY direct signal the unified teal Signal ring — RFP events included', () => {
+  it('gives ANY direct signal the unified Signal ring — RFP events included', () => {
     expect(ringsFor({ signal: { strength: 1, date: daysAgo(1), type: 'signal_stacks' } })).toEqual(['signal']);
     expect(ringsFor({ signal: { strength: 1, date: daysAgo(1), type: 'rfp' } })).toEqual(['signal']);
   });
 
-  it('gives sister-agency clients the yellow ring, stacking with signal', () => {
-    expect(ringsFor({ signal: null, sister_agency: true })).toEqual(['sister']);
+  it('no longer renders a sister-agency ring (removed 2026-08-05; flag stays in data)', () => {
+    expect(ringsFor({ signal: null, sister_agency: true })).toEqual([]);
     expect(ringsFor({ signal: { strength: 1, date: daysAgo(1), type: 'rfp' }, sister_agency: true })).toEqual([
       'signal',
-      'sister',
     ]);
   });
 

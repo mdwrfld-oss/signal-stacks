@@ -115,21 +115,18 @@ export function isFloorState(node, effective) {
 }
 
 /**
- * Ring types — simplified two-ring model (Section 9 revision):
- * - 'signal' (teal): ANY active direct signal — Signal Stacks detection or
- *   RFP-sourced event. RFP events no longer get their own ring color; they
- *   still darken fill and activate this ring.
- * - 'sister' (yellow): confirmed Project Worldwide sister-agency client
- *   (§5a.1 — Subaru and Lagunitas are the first real examples).
- * New additions no longer get a ring at all — see isNewAddition below
- * (brighter pulsing glow for the first week instead, §9/§11).
- * Direct signals only, per open question #13 — inherited signals get fill,
- * not rings.
+ * Ring types — currently a single ring:
+ * - 'signal' (white): ANY active direct signal — Signal Stacks detection or
+ *   RFP-sourced event. Reads as a clean accent on any node fill.
+ * The sister-agency ring (formerly #B83A1A on sister_agency nodes) was
+ * REMOVED from the render 2026-08-05 — no replacement decided yet; the
+ * sister_agency flag stays in the data, just isn't drawn as a ring.
+ * New additions get a brighter pulsing glow, not a ring (§9/§11). Direct
+ * signals only — inherited/propagated signals get fill, not rings.
  */
 export function ringsFor(node) {
   const rings = [];
   if (node.signal) rings.push('signal');
-  if (node.sister_agency) rings.push('sister');
   return rings;
 }
 

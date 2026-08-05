@@ -623,26 +623,49 @@ function render(graph) {
     }
   }
   const vector = vectorLayer
-    .selectAll('line')
+    .selectAll('line.signal-vector')
     .data(vectorData)
     .join('line')
     .attr('class', (d) => `signal-vector level-${d.level}`)
-    .attr('marker-end', 'url(#vector-head)')
-    .style('opacity', (d) => 0.9 - d.level * 0.14);
+    .attr('marker-end', 'url(#vector-head)');
+  // Item 3: a well name shown next to a selected entity's arrow (hidden until
+  // its own entity is selected). Separate from well isolation (item 4).
+  const vectorLabel = vectorLayer
+    .selectAll('text.vector-label')
+    .data(vectorData)
+    .join('text')
+    .attr('class', 'vector-label')
+    .style('display', 'none')
+    .text((d) => wellLabel(d.well));
 
   function updateVectors() {
     vector.each(function (d) {
       const a = culturalAnchors.get(d.well);
-      const angle = Math.atan2(a.y - d.node.y, a.x - d.node.x);
+      d.__angle = Math.atan2(a.y - d.node.y, a.x - d.node.x);
       const start = d.node.r + RING_GAP * d.node.rings.length + 4;
       const len = VECTOR_BASE_LEN - d.level * VECTOR_LEN_STEP;
+      d.__tipX = d.node.x + (start + len) * Math.cos(d.__angle);
+      d.__tipY = d.node.y + (start + len) * Math.sin(d.__angle);
       d3.select(this)
-        .attr('x1', d.node.x + start * Math.cos(angle))
-        .attr('y1', d.node.y + start * Math.sin(angle))
-        .attr('x2', d.node.x + (start + len) * Math.cos(angle))
-        .attr('y2', d.node.y + (start + len) * Math.sin(angle));
+        .attr('x1', d.node.x + start * Math.cos(d.__angle))
+        .attr('y1', d.node.y + start * Math.sin(d.__angle))
+        .attr('x2', d.__tipX)
+        .attr('y2', d.__tipY);
     });
+    vectorLabel
+      .attr('x', (d) => d.__tipX + 7 * Math.cos(d.__angle))
+      .attr('y', (d) => d.__tipY + 7 * Math.sin(d.__angle) + 3)
+      .attr('text-anchor', (d) => (Math.cos(d.__angle) > 0.3 ? 'start' : Math.cos(d.__angle) < -0.3 ? 'end' : 'middle'));
   }
+
+  // Item 3: entity selection dims every arrow except the selected entity's,
+  // and reveals that entity's arrow label(s). Independent of well isolation.
+  function applyVectorSelection() {
+    const sel = state.selected;
+    vector.style('opacity', (d) => (sel && d.node.id !== sel.id ? 0.1 : 0.9 - d.level * 0.14));
+    vectorLabel.style('display', (d) => (sel && d.node.id === sel.id ? null : 'none'));
+  }
+  applyVectorSelection(); // set base arrow opacity
 
   /* nodes */
   const node = nodeLayer
@@ -750,6 +773,9 @@ function render(graph) {
       b.classList.toggle('active', b.dataset.well === wellId)
     );
     wellLabels.classed('active', (d) => d.id === wellId);
+    // Item 4: while a well is isolated, dim every OTHER well's label so only
+    // the selected one stays at full accent.
+    wellLabels.classed('well-dimmed', (d) => wellId != null && d.id !== wellId);
     updateWedge(); // item 7
     applyGlow();
   }
@@ -765,6 +791,9 @@ function render(graph) {
   function applyMapChrome(mapId) {
     document.documentElement.style.setProperty('--map-accent', MAP_ACCENT[mapId]);
     document.getElementById('canvas').classList.toggle('cultural-active', mapId === 'cultural');
+    // Item 1: the legend's client-color word tracks the active map.
+    const clientColorWord = document.getElementById('legend-client-color');
+    if (clientColorWord) clientColorWord.textContent = mapId === 'cultural' ? 'yellow' : 'purple';
     rail.classList.toggle('hidden', mapId !== 'cultural');
     if (mapId !== 'cultural' && state.isolatedWell) setIsolatedWell(null);
     else applyGlow();
@@ -1028,6 +1057,7 @@ function render(graph) {
     viewport.classed('has-selection', true);
     link.classed('connected', (l) => l.source === d || l.target === d);
     node.classed('neighbor', (n) => neighbors.has(n));
+    applyVectorSelection(); // item 3
     showPanel(d);
   }
 
@@ -1036,6 +1066,7 @@ function render(graph) {
     viewport.classed('has-selection', false);
     node.classed('selected', false).classed('neighbor', false);
     link.classed('connected', false);
+    applyVectorSelection(); // item 3
     panel.classList.add('hidden');
   }
 

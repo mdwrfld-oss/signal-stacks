@@ -145,6 +145,8 @@ body { display: flex; flex-direction: column; }
   letter-spacing: 0.22em;
 }
 .well-label.active { fill: rgba(255, 210, 46, 0.95); }
+/* Item 4: non-selected well labels recede while a well is isolated. */
+.well-label.well-dimmed { fill: rgba(255, 210, 46, 0.1); }
 /* Item 5: business well labels in the business (purple) accent — brightened. */
 .well-label.business { fill: rgba(183, 152, 230, 0.78); }
 .signal-vector {
@@ -153,6 +155,16 @@ body { display: flex; flex-direction: column; }
   stroke-linecap: round;
 }
 .signal-vector.dimmed { opacity: 0.06 !important; }
+/* Item 3: well name shown beside a selected entity's arrow. */
+.vector-label {
+  fill: #ffe89a;
+  font-size: 11px;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: rgba(13, 11, 26, 0.9);
+  stroke-width: 3px;
+  pointer-events: none;
+}
 
 /* Items 5/6: sector-divider rays from map center to each well — faint grid
    lines (per-map, faded via chrome), not solid fills. */
@@ -162,7 +174,8 @@ body { display: flex; flex-direction: column; }
 /* Item 7: cultural isolation wedge — a faint slice over the isolated well's
    sector, additive to the per-node score glow (§II.13). Red family, matching
    the isolation glow. */
-.isolation-wedge { fill: rgba(184, 58, 26, 0.11); stroke: none; pointer-events: none; }
+/* Item 4: more saturated so the isolated well's sector reads as "illuminated". */
+.isolation-wedge { fill: rgba(206, 60, 27, 0.34); stroke: none; pointer-events: none; }
 
 /* Step 4: cloak competitor/adjacent nodes (and their links + ghosts) on the
    Cultural Landscape — they have no cultural_verticals, so their position
@@ -183,12 +196,14 @@ body { display: flex; flex-direction: column; }
     drop-shadow(0 0 16px rgba(235, 235, 255, 0.4));
 }
 .node circle.core.glow-floor { opacity: 0.72; }
-/* Items 2/11: parents are backgrounded structure — white, faded, larger
-   (radius set in app.js), with only a soft halo. */
+/* Items 2/11 + item 5: parents are backgrounded structure — white, larger,
+   pushed well back at rest. Selecting one restores full visibility (the fade
+   is only for the ambient/unselected state). */
 .node circle.core.glow-parent {
-  opacity: 0.42;
-  filter: drop-shadow(0 0 8px rgba(245, 243, 255, 0.4));
+  opacity: 0.26;
+  filter: drop-shadow(0 0 8px rgba(245, 243, 255, 0.35));
 }
+.node.selected circle.core.glow-parent { opacity: 1; }
 /* Item 3: on the Business Landscape, competitors start well below the floor
    baseline; selecting their connected hub brightens them (neighbor state). */
 #canvas:not(.cultural-active) .node.type-adjacent circle.core.glow-floor { opacity: 0.36; }
@@ -206,7 +221,7 @@ body { display: flex; flex-direction: column; }
    node fills alike — a thin dark separation keeps it legible even over the
    white glow of a signal-derived non-client. */
 .ring.signal { stroke: var(--ring-signal); filter: drop-shadow(0 0 1.4px rgba(0, 0, 0, 0.75)); }
-.ring.sister { stroke: var(--ring-sister); }
+/* Sister-agency ring removed from the render 2026-08-05 (item 2). */
 
 /* §9/§11: new additions pulse brighter for their first week — replaces the
    old red new-addition ring entirely. */
@@ -231,7 +246,6 @@ body { display: flex; flex-direction: column; }
 }
 .zoomed-in .ring-label { display: block; }
 .ring-label.signal { fill: var(--ring-signal); }
-.ring-label.sister { fill: var(--ring-sister); }
 
 /* §5d typography hierarchy: G7's own roster (hubs/parents) reads prominent;
    competitor/adjacent entities are permanently subordinate — reinforcing the
@@ -247,9 +261,10 @@ body { display: flex; flex-direction: column; }
 }
 .node-label.adjacent-label { font-size: 7.5px; font-weight: 400; fill: #8f87ad; }
 .zoomed-out .adjacent-label { display: none; }
-/* Item 11: parent labels fade with the backgrounded parent node, but stay a
-   good deal more legible than the node's own 0.42 fade. */
-.node-label.parent-label { fill: #a89ec4; opacity: 0.78; }
+/* Item 11 + item 5: parent labels fade with the backgrounded node at rest
+   (still a touch more legible than the node), and return to full on select. */
+.node-label.parent-label { fill: #a89ec4; opacity: 0.55; }
+.node.selected .node-label.parent-label { fill: #e2ddf2; opacity: 1; }
 /* §4g competitor-dim: labels fully hidden, not faded. */
 .competitors-hidden .adjacent-label { display: none !important; }
 
@@ -458,12 +473,13 @@ body { display: flex; flex-direction: column; }
 }
 .legend-row { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
 .swatch { width: 14px; height: 14px; border-radius: 50%; flex: 0 0 auto; }
-.swatch.gradient { background: linear-gradient(90deg, rgba(150, 150, 165, 0.15), #b9b9cc); border-radius: 4px; }
-.swatch.client { background: #f5f3ff; box-shadow: 0 0 7px rgba(255, 255, 255, 0.8); }
+/* Signaled non-client renders white now (was gray). */
+.swatch.gradient { background: #f6f4ff; box-shadow: 0 0 6px rgba(255, 255, 255, 0.7); }
+/* Item 1: client swatch tracks the active map's accent (purple / yellow). */
+.swatch.client { background: var(--map-accent); box-shadow: 0 0 7px var(--map-accent); }
 .swatch.floor { background: var(--floor-gray); }
 .swatch.ring { background: #fff; border: 2.5px solid; }
 .swatch.ring-signal { border-color: var(--ring-signal); }
-.swatch.ring-sister { border-color: var(--ring-sister); }
 .swatch.pulse {
   background: radial-gradient(circle, #e6d6ff 0%, #a886ff 45%, transparent 75%);
   animation: new-pulse 2.6s ease-in-out infinite;
