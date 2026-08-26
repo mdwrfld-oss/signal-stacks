@@ -163,3 +163,20 @@ export function arrowDecayLevel(signal, nowMs) {
   const level = Math.floor(days / ARROW_LEVEL_DAYS);
   return level >= ARROW_MAX_LEVELS ? null : level;
 }
+
+// Full 24-week window in days (the arrows' 6 × 4-week schedule).
+export const SIGNAL_WINDOW_DAYS = ARROW_MAX_LEVELS * ARROW_LEVEL_DAYS; // 168
+
+/**
+ * CONTINUOUS recency fraction over that exact 24-week window (item 3): the
+ * smooth analogue of arrowDecayLevel's 6 discrete steps. 1 = just signaled,
+ * decreasing linearly to 0 at 24 weeks (and 0 for no/expired/invalid signal).
+ * Drives the non-client glow gradient from full white → floor dim.
+ */
+export function signalGlowFraction(signal, nowMs) {
+  if (!signal || !signal.date) return 0;
+  const signalMs = Date.parse(signal.date);
+  if (Number.isNaN(signalMs)) return 0;
+  const days = Math.max(0, (nowMs - signalMs) / MS_PER_DAY);
+  return Math.max(0, 1 - days / SIGNAL_WINDOW_DAYS);
+}

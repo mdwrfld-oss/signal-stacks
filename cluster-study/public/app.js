@@ -23,6 +23,7 @@ import {
   ringsFor,
   isNewAddition,
   arrowDecayLevel,
+  signalGlowFraction,
 } from '/scoring.js';
 import {
   BUSINESS_VERTICALS,
@@ -63,9 +64,12 @@ const MAP_TRANSITION_MS = 1100;
 // the anchor geometry, not by repulsion — node/label sizes are fixed, so
 // scaling the wells apart (then letting fit-to-view re-normalize) is what buys
 // real whitespace between families and standalone hubs. Bumped ~20% this pass.
-// Business wells: 3×3 grid of anchor points (9 verticals).
-const BIZ_COL_STEP = 800;
-const BIZ_ROW_STEP = 680;
+// Business wells on an ellipse ring (was a 3×3 grid — item 5: the grid's
+// center cell parked "Sports" at the map center instead of on the perimeter,
+// and a grid can't hold 11 wells anyway). Count-agnostic: lays out however
+// many BUSINESS_VERTICALS there are, so the pending 9→11 expansion just works.
+const BIZ_RX = 960;
+const BIZ_RY = 720;
 // Cultural wells: 13 anchor points on an ellipse.
 const CULT_RX = 990;
 const CULT_RY = 700;
@@ -112,6 +116,8 @@ const MAP_ACCENT = { business: '#9a6cd3', cultural: '#ffd22e' };
 const ISOLATION_COLOR = '#B83A1A';
 const ISOLATION_RGB = '184,58,26';
 const isolationFill = d3.interpolateRgb('#1a0d0a', ISOLATION_COLOR);
+// Item 3: non-client fill blends floor-gray → white by signal-age recency.
+const floorToWhite = d3.interpolateRgb('#4b4960', '#f6f4ff');
 
 // §5c idle drift (resolves open question 4b in favor of "yes, drift"):
 // stars drift gently at rest. Purely visual — the offset is applied to the
@@ -324,10 +330,10 @@ function render(graph) {
   const cx = width / 2;
   const cy = height / 2;
   const businessAnchors = new Map(
-    BUSINESS_VERTICALS.map((v, i) => [
-      v.id,
-      { x: cx + ((i % 3) - 1) * BIZ_COL_STEP, y: cy + (Math.floor(i / 3) - 1) * BIZ_ROW_STEP },
-    ])
+    BUSINESS_VERTICALS.map((v, i) => {
+      const a = (i / BUSINESS_VERTICALS.length) * 2 * Math.PI - Math.PI / 2;
+      return [v.id, { x: cx + BIZ_RX * Math.cos(a), y: cy + BIZ_RY * Math.sin(a) }];
+    })
   );
   const culturalAnchors = new Map(
     CULTURAL_VERTICALS.map((v, i) => {
@@ -354,18 +360,16 @@ function render(graph) {
     .attr('y', (d) => d.y)
     .text((d) => d.label.toUpperCase());
 
-  /* Step 6: business well labels — same faint cartographic treatment on the
-     3×3 grid of business anchors. Pushed radially outward from grid center so
-     each label sits just beyond its cluster (the center well nudges up). */
+  /* Step 6: business well labels — same faint cartographic treatment, pushed
+     radially outward from center so each sits just beyond its cluster on the
+     ring (all wells are on the perimeter now — no center well). */
   const BIZ_LABEL_OFFSET = 110;
   const businessLabelPoints = BUSINESS_VERTICALS.map((v) => {
     const a = businessAnchors.get(v.id);
     const dx = a.x - cx;
     const dy = a.y - cy;
-    const len = Math.hypot(dx, dy);
-    const x = len < 1 ? cx : a.x + (dx / len) * BIZ_LABEL_OFFSET;
-    const y = len < 1 ? cy - 120 : a.y + (dy / len) * BIZ_LABEL_OFFSET;
-    return { id: v.id, label: v.label, x, y };
+    const len = Math.hypot(dx, dy) || 1;
+    return { id: v.id, label: v.label, x: a.x + (dx / len) * BIZ_LABEL_OFFSET, y: a.y + (dy / len) * BIZ_LABEL_OFFSET };
   });
   businessLabelLayer
     .selectAll('text')
@@ -405,23 +409,41 @@ function render(graph) {
   /* Item 7: cultural isolation wedge — a faint filled slice over the isolated
      well's angular sector, an orientation cue additive to the per-node score
      glow (§II.13). Built once; shown/hidden by setIsolatedWell. */
+  // Item 4: radial fade so the wedge's far edge DISSOLVES via opacity falloff
+  // (no hard arc / rounded cap). userSpaceOnUse gradient from center outward;
+  // updateWedge sets its radius to that well's reach so it's transparent by
+  // the outer edge.
+  const wedgeGrad = svg
+    .append('defs')
+    .append('radialGradient')
+    .attr('id', 'wedge-fade')
+    .attr('gradientUnits', 'userSpaceOnUse');
+  wedgeGrad.append('stop').attr('offset', '0%').attr('stop-color', '#ce3c1b').attr('stop-opacity', 0.42);
+  wedgeGrad.append('stop').attr('offset', '55%').attr('stop-color', '#ce3c1b').attr('stop-opacity', 0.3);
+  wedgeGrad.append('stop').attr('offset', '100%').attr('stop-color', '#ce3c1b').attr('stop-opacity', 0);
+
+  const WEDGE_REACH = 0.95; // out toward the well anchor, staying inside the fit
+  const wedgeAngle = (i) => (i / CULTURAL_VERTICALS.length) * 2 * Math.PI - Math.PI / 2;
+  const ellipseRadiusAt = (a) => 1 / Math.hypot(Math.cos(a) / CULT_RX, Math.sin(a) / CULT_RY);
   const wedgePath = wedgeLayer.append('path').attr('class', 'isolation-wedge').style('display', 'none');
   function wedgeFor(wellId) {
     const i = CULTURAL_VERTICALS.findIndex((v) => v.id === wellId);
     if (i < 0) return null;
-    const center = (i / CULTURAL_VERTICALS.length) * 2 * Math.PI - Math.PI / 2;
+    const center = wedgeAngle(i);
     const half = Math.PI / CULTURAL_VERTICALS.length;
-    const reach = 0.95; // out toward the well anchor, staying inside the fit
     const pts = [];
     for (let t = 0; t <= 12; t++) {
       const a = center - half + (2 * half * t) / 12;
-      pts.push(`${(cx + CULT_RX * reach * Math.cos(a)).toFixed(1)},${(cy + CULT_RY * reach * Math.sin(a)).toFixed(1)}`);
+      pts.push(`${(cx + CULT_RX * WEDGE_REACH * Math.cos(a)).toFixed(1)},${(cy + CULT_RY * WEDGE_REACH * Math.sin(a)).toFixed(1)}`);
     }
     return `M${cx},${cy} L${pts.join(' L')} Z`;
   }
   function updateWedge() {
     const w = state.map === 'cultural' ? state.isolatedWell : null;
     if (!w) return wedgePath.style('display', 'none');
+    const i = CULTURAL_VERTICALS.findIndex((v) => v.id === w);
+    // Fade completes right at the wedge's outer reach for this well's bearing.
+    wedgeGrad.attr('cx', cx).attr('cy', cy).attr('r', (WEDGE_REACH * ellipseRadiusAt(wedgeAngle(i))).toFixed(1));
     wedgePath.attr('d', wedgeFor(w)).style('display', null);
   }
 
@@ -750,18 +772,21 @@ function render(graph) {
         } else {
           c.style('filter', null).classed('glow-client', true); // white halo via CSS class
         }
-      } else if (!d.glowFloor) {
-        // Signal-derived non-clients (Ulta, Reddit, Stella, PLL): plain white
-        // glow on both maps (items 1 & 9).
-        const a = 0.5 + 0.45 * Math.min(1, d.glowRelevance);
-        c.style('fill', '#f6f4ff').style(
-          'filter',
-          `drop-shadow(0 0 5px rgba(255,255,255,${a})) drop-shadow(0 0 13px rgba(235,235,255,${a * 0.6}))`
-        );
       } else {
-        // Floor / competitors: dim placeholder (business dims these further +
-        // brightens on hub selection via CSS — item 3).
-        c.style('fill', 'var(--floor-gray)').style('filter', null).classed('glow-floor', true);
+        // Item 3: non-client RECENCY glow — a continuous gradient from full
+        // white (freshly signaled) to floor dim-gray (old/no signal), on the
+        // SAME 24-week/6-level signal-age schedule as the arrows. Smooth, not
+        // stepped. Clients (handled above) are excluded — fixed accent, no
+        // recency layered on top.
+        const f = signalGlowFraction(d.signal, now);
+        if (f <= 0) {
+          c.style('fill', 'var(--floor-gray)').style('filter', null).classed('glow-floor', true);
+        } else {
+          c.style('fill', floorToWhite(f)).style(
+            'filter',
+            `drop-shadow(0 0 ${(3 + 8 * f).toFixed(1)}px rgba(255,255,255,${(0.85 * f).toFixed(3)})) drop-shadow(0 0 ${(8 + 10 * f).toFixed(1)}px rgba(235,235,255,${(0.5 * f).toFixed(3)}))`
+          );
+        }
       }
     });
   }

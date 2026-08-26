@@ -44,7 +44,8 @@
     "structural_analogs_removed": "RESOLVED 2026-07-20: the structural_analogs field/relationship type has been removed entirely. Reasoning: unlike direct_competitor and analogous_audience (defensible from observable market facts), structural analogy was an inherently subjective judgment call that visually implied a factual relationship it wasn't. Dropped ahead of the broader team showing.",
     "is_g7_client_definition": "REDEFINED 2026-07-20: is_g7_client means \"G7 has a real, evidenced relationship with this entity\" (current or lapsed) — not \"actively working together this quarter.\" Current/lapsed distinction remains in g7_notes.relationship_notes as text, not as a separate visual/color channel. See plan doc II.15.",
     "coi_flag_removed": "REMOVED 2026-07-20: the coi_sensitive/coi_note fields on adjacent competitor entries (MABI-family competitors) have been dropped entirely. Reasoning: many brands span multiple product lines where only some genuinely conflict with a client relationship and others don't -- an entity-level COI flag can't accurately represent that nuance, and a wrong flag (in either direction) is worse than no flag. NBD judgment covers this better than a blanket data-layer marker. Distinct from the narrower, still-valid talent-partnership-overlap COI concept in plan doc Sec. 10.3/10.4, which is unaffected.",
-    "cap_phase_2c_backfill": "MERGED 2026-08-06: 48 net-new entities (confidence: provisional_bootstrap) appended from CAP Phase 2c backfill. Each has complete 13-well cultural_verticals (0-5) and NO business_verticals — hidden from the Business Landscape until a business-vertical onboarding pass exists. The CAP bootstrap file regenerated the original 19 WITHOUT business_verticals, so those were merged from the repo copy (business_verticals preserved) rather than wholesale-replaced. Note: CAP added Cutwater (cutwater) and Rockstar Energy (rockstar_energy) as NEW provisional hubs; the repo already carries \"Cutwater Spirits\" and \"Rockstar\" as adjacent competitors — brand duplication to reconcile in a future data pass (they never co-render: the 48 are Business-hidden, adjacents are Cultural-cloaked)."
+    "cap_phase_2c_backfill": "MERGED 2026-08-06: 48 net-new entities (confidence: provisional_bootstrap) appended from CAP Phase 2c backfill. Each has complete 13-well cultural_verticals (0-5) and NO business_verticals — hidden from the Business Landscape until a business-vertical onboarding pass exists. The CAP bootstrap file regenerated the original 19 WITHOUT business_verticals, so those were merged from the repo copy (business_verticals preserved) rather than wholesale-replaced. Note: CAP added Cutwater (cutwater) and Rockstar Energy (rockstar_energy) as NEW provisional hubs; the repo already carries \"Cutwater Spirits\" and \"Rockstar\" as adjacent competitors — brand duplication to reconcile in a future data pass (they never co-render: the 48 are Business-hidden, adjacents are Cultural-cloaked).",
+    "ole_client_correction": "CORRECTED 2026-08-26: Olé Cocktail Co. is_g7_client flipped true→false — not a G7 client. Renders as a non-client (recency glow if signaled, else floor), never the purple/yellow client identity color."
   },
   "hub_nodes": [
     {
@@ -967,7 +968,7 @@
           "note": "Same category"
         }
       ],
-      "is_g7_client": true,
+      "is_g7_client": false,
       "sister_agency": false,
       "cultural_verticals": {
         "music_performance": 2,

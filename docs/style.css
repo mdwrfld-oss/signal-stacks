@@ -174,8 +174,9 @@ body { display: flex; flex-direction: column; }
 /* Item 7: cultural isolation wedge — a faint slice over the isolated well's
    sector, additive to the per-node score glow (§II.13). Red family, matching
    the isolation glow. */
-/* Item 4: more saturated so the isolated well's sector reads as "illuminated". */
-.isolation-wedge { fill: rgba(206, 60, 27, 0.34); stroke: none; pointer-events: none; }
+/* Item 4: saturated near center, fading to transparent at the outer edge via
+   the #wedge-fade radial gradient (no hard arc / rounded cap). */
+.isolation-wedge { fill: url(#wedge-fade); stroke: none; pointer-events: none; }
 
 /* Step 4: cloak competitor/adjacent nodes (and their links + ghosts) on the
    Cultural Landscape — they have no cultural_verticals, so their position
