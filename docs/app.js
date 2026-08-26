@@ -95,7 +95,7 @@ const state = {
   lens: 'all',
   signalsOnly: false, // §4g
   dimCompetitors: false, // §4g
-  map: 'business', // II.2: active landscape
+  map: 'cultural', // II.2: active landscape (Cultural is the default view)
   isolatedWell: null, // II.3: active cultural gravity-well isolation
   selected: null,
   k: 1,
@@ -613,7 +613,7 @@ function render(graph) {
     simulation.force('y').y((n) => n.homeY).strength(ANCHOR_STRENGTH);
     simulation.alpha(0);
   }
-  applyMap('business');
+  applyMap('cultural'); // Cultural is the default landscape on load
 
   /* II.4 concentric family rings: one dashed ring per child, at that child's
      true independently-computed distance from the shared centroid — a
