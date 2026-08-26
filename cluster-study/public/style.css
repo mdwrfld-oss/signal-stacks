@@ -184,6 +184,11 @@ body { display: flex; flex-direction: column; }
 #canvas.cultural-active .ghost.type-adjacent,
 #canvas.cultural-active .link.adjacent-link { display: none; }
 
+/* Item 2: CAP backfill entities have no business_verticals, so they're hidden
+   on the Business Landscape (they render only on Cultural). */
+#canvas:not(.cultural-active) .node.biz-hidden,
+#canvas:not(.cultural-active) .ghost.biz-hidden { display: none; }
+
 .node { cursor: pointer; }
 /* Contrast pass: a slightly stronger rim so even floor nodes separate from
    the near-black background at rest. */

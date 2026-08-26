@@ -237,6 +237,11 @@ function prepare(graph) {
       // dominate position, so near-tied profiles stop stacking at the center.
       cultural: normalizeScores(n.cultural_verticals, CULTURAL_VERTICALS, CULT_SCORE_GAMMA),
     };
+    // CAP Phase 2c decision (flagged): the 48 backfill hubs have cultural
+    // scores but NO business_verticals, so nothing positions them on the
+    // Business Landscape — hide them there entirely until a business-vertical
+    // onboarding pass exists. (Only hub nodes; adjacents still place via links.)
+    n.businessHidden = n.type === 'hub' && !n.weights.business;
   }
 }
 
@@ -497,7 +502,13 @@ function render(graph) {
     const pos = semanticPositions(mapId);
     for (const n of graph.nodes) {
       const p = pos.get(n.id);
-      if (p) {
+      if (mapId === 'business' && n.businessHidden) {
+        // Item 2: no business position — park far off-canvas, PINNED, so these
+        // 48 invisible hub-charge nodes neither distort the visible layout nor
+        // drift back to center. Hidden via CSS + excluded from the fit.
+        n.x = n.fx = cx;
+        n.y = n.fy = cy - 100000;
+      } else if (p) {
         n.x = n.fx = p.x;
         n.y = n.fy = p.y;
       } else if (warm && !(state.neighborHubs.get(n.id)?.size > 0) && n.weights?.business) {
@@ -546,7 +557,11 @@ function render(graph) {
       fam.ring[mapId] = p ? fam.children.map((ch) => Math.hypot(ch.x - p.x, ch.y - p.y)) : [];
     }
     const snapshot = new Map();
-    for (const n of graph.nodes) snapshot.set(n.id, { x: n.x, y: n.y, pinned: pos.has(n.id) });
+    for (const n of graph.nodes) {
+      // Parked business-hidden nodes stay pinned so they don't drift into view.
+      const pinned = pos.has(n.id) || (mapId === 'business' && n.businessHidden);
+      snapshot.set(n.id, { x: n.x, y: n.y, pinned });
+    }
     return snapshot;
   }
 
@@ -672,8 +687,9 @@ function render(graph) {
     .selectAll('g.node')
     .data(graph.nodes)
     .join('g')
-    // Step 4: type class lets CSS cloak adjacents on the Cultural Landscape.
-    .attr('class', (d) => `node type-${d.type}`)
+    // Step 4: type class cloaks adjacents on Cultural; biz-hidden cloaks the
+    // business_verticals-less CAP entities on Business (item 2).
+    .attr('class', (d) => `node type-${d.type}${d.businessHidden ? ' biz-hidden' : ''}`)
     .on('click', (event, d) => {
       event.stopPropagation();
       selectNode(d);
@@ -846,7 +862,13 @@ function render(graph) {
     // labels that give placement its meaning are on screen from the start
     // (wider pad: labels are middle-anchored and extend past their points).
     const pad = 130;
-    const pts = [...mapPositions[mapId].values()];
+    const pts = [];
+    for (const [id, p] of mapPositions[mapId]) {
+      // Item 2: parked (off-canvas) business-hidden nodes must not blow up the
+      // business fit.
+      if (mapId === 'business' && state.nodesById.get(id)?.businessHidden) continue;
+      pts.push(p);
+    }
     pts.push(...(mapId === 'cultural' ? wellLabelPoints : businessLabelPoints));
     const xs = d3.extent(pts, (p) => p.x);
     const ys = d3.extent(pts, (p) => p.y);
@@ -959,7 +981,7 @@ function render(graph) {
     .selectAll('g.ghost')
     .data(graph.nodes, (d) => d.id)
     .join((enter) => {
-      const g = enter.append('g').attr('class', (d) => `ghost type-${d.type}`);
+      const g = enter.append('g').attr('class', (d) => `ghost type-${d.type}${d.businessHidden ? ' biz-hidden' : ''}`);
       g.append('line').attr('class', 'ghost-link');
       g.append('circle').attr('class', 'ghost-node');
       return g;
@@ -1195,7 +1217,10 @@ function showPanel(d) {
   const parts = [];
 
   parts.push(`<h2>${esc(d.name)}</h2>`);
-  const sub = [d.type === 'hub' ? 'G7 client hub' : d.type === 'parent' ? 'Corporate parent' : 'Adjacent brand'];
+  // A hub is only a "G7 client hub" if it actually is one; the CAP backfill
+  // (and signal-sourced) hubs are non-client entities, so don't mislabel them.
+  const hubKind = d.is_g7_client ? 'G7 client hub' : 'Entity';
+  const sub = [d.type === 'hub' ? hubKind : d.type === 'parent' ? 'Corporate parent' : 'Adjacent brand'];
   if (d.category) sub.push(esc(d.category));
   parts.push(`<div class="subtitle">${sub.join(' · ')}</div>`);
 
