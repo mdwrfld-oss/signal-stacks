@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>G7 Cluster Study</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <header id="toolbar">
+    <div id="brand">
+      <span id="brand-mark">G7</span>
+      <span id="brand-title">Cluster Study</span>
+      <span id="source-badge" title="Where the current graph data came from"></span>
+    </div>
+    <div id="map-toggle" role="group" aria-label="Landscape">
+      <button data-map="cultural" class="active" title="Position = how each company behaves as a marketer (cultural-vertical wells)">Cultural Landscape</button>
+      <button data-map="business" title="Position = what each company sells (business-vertical wells)">Business Landscape</button>
+    </div>
+    <div id="lens-toggle" role="group" aria-label="Lens">
+      <button data-lens="all" class="active">All</button>
+      <button data-lens="experiential">Experiential</button>
+      <button data-lens="talent">Talent</button>
+    </div>
+    <div id="filter-toggles" role="group" aria-label="View filters">
+      <button id="toggle-signals" title="Dim every node without an active signal ring">Signals only</button>
+      <button id="toggle-competitors" title="Dim competitor/adjacent nodes and hide their labels">Dim competitors</button>
+    </div>
+    <div id="controls">
+      <input id="search" list="search-list" placeholder="Search brands…" autocomplete="off" />
+      <datalist id="search-list"></datalist>
+      <button id="add-entity" disabled title="Manual entity entry — coming soon">+ Add entity</button>
+      <button id="reset-view" title="Reset pan and zoom">Reset view</button>
+    </div>
+  </header>
+
+  <main id="stage">
+    <svg id="canvas"></svg>
+
+    <div id="well-rail" class="hidden" aria-label="Cultural gravity wells"></div>
+    <div id="biz-rail" class="hidden" aria-label="Business vertical filter"></div>
+
+    <aside id="detail-panel" class="hidden">
+      <button id="panel-close" aria-label="Close">×</button>
+      <div id="panel-content"></div>
+    </aside>
+
+    <div id="legend">
+      <div class="legend-row"><span class="swatch client"></span> G7 client — <span id="legend-client-color">purple</span> glow</div>
+      <div class="legend-row"><span class="swatch gradient"></span> Signaled non-client — white glow, fades with signal age</div>
+      <div class="legend-row"><span class="swatch floor"></span> Floor state — dim placeholder (no client, no signal)</div>
+      <div class="legend-row"><span class="swatch ring ring-new"></span> New addition ring — first week in Cluster Study (drops after)</div>
+      <div class="legend-row"><span class="swatch pulse"></span> New addition — pulsing glow (first week)</div>
+      <div class="legend-row"><span class="swatch orbit"></span> Corporate family — concentric rings, one per child's true distance from the shared centroid</div>
+      <div class="legend-row"><span class="swatch vector"></span> Signal vector — points to the evidenced well (fades ~6 mo)</div>
+    </div>
+
+    <div id="status">Loading…</div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

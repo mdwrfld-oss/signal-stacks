@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>G7 Cluster Study — RFP Lookalike Review</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body class="review-body">
+  <h1>RFP Lookalike Pipeline</h1>
+  <p class="review-msg">Paste an RFP brief (or response summary) for a client G7 pitched. The pipeline extracts a profile, web-searches for parallel brands, and queues candidates here for approval. Approved candidates become floor-state nodes on the <a href="/">Cluster map</a> — nothing goes live without sign-off.</p>
+
+  <div class="review-card">
+    <h3>Access</h3>
+    <input type="password" id="secret" placeholder="Trigger secret (Bearer token)" />
+  </div>
+
+  <div class="review-card">
+    <h3>Run a new lookalike search</h3>
+    <input type="text" id="client-name" placeholder="Client / brand pitched (e.g. Subaru)" />
+    <input type="text" id="client-hub-id" placeholder="Cluster hub id to attach candidates to (e.g. subaru) — optional" />
+    <select id="lane">
+      <option value="">Lane (optional)</option>
+      <option value="Experiential">Experiential</option>
+      <option value="Talent Booking">Talent Booking</option>
+      <option value="Combo">Combo</option>
+    </select>
+    <select id="outcome">
+      <option value="lost">RFP outcome: Lost</option>
+      <option value="won">RFP outcome: Won</option>
+      <option value="pursued">RFP outcome: Pursued</option>
+    </select>
+    <textarea id="rfp-text" placeholder="Paste the RFP brief / response deck summary here…"></textarea>
+    <button class="primary" id="run-btn">Run lookalike search</button>
+    <p class="review-msg" id="run-msg"></p>
+  </div>
+
+  <h2>Pending review</h2>
+  <div id="batches"></div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const secretInput = $('secret');
+    secretInput.value = localStorage.getItem('cluster_secret') || '';
+    secretInput.addEventListener('change', () => localStorage.setItem('cluster_secret', secretInput.value));
+
+    const headers = () => ({
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${secretInput.value}`,
+    });
+
+    async function loadPending() {
+      const container = $('batches');
+      if (!secretInput.value) {
+        container.innerHTML = '<p class="review-msg">Enter the trigger secret to load pending batches.</p>';
+        return;
+      }
+      const resp = await fetch('/api/rfp/pending', { headers: headers() });
+      if (!resp.ok) {
+        container.innerHTML = `<p class="review-msg">Could not load pending batches (${resp.status}).</p>`;
+        return;
+      }
+      const { batches } = await resp.json();
+      if (!batches.length) {
+        container.innerHTML = '<p class="review-msg">Nothing pending.</p>';
+        return;
+      }
+      container.innerHTML = batches.map(renderBatch).join('');
+      container.querySelectorAll('button[data-batch]').forEach((btn) =>
+        btn.addEventListener('click', () => submitReview(btn.dataset.batch))
+      );
+    }
+
+    function esc(s) {
+      return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+    }
+
+    function renderBatch(b) {
+      const pending = b.candidates.filter((c) => c.status === 'pending');
+      return `<div class="review-card" id="batch-${esc(b.id)}">
+        <h3>${esc(b.client_name || 'Unknown client')} — ${esc(b.lane || 'no lane')} · ${esc(b.outcome)} · ${esc(b.created.split('T')[0])}</h3>
+        <p class="review-msg"><strong>Profile:</strong> ${esc(b.profile?.ip_category || '')} · ${esc(b.profile?.target_audience || '')}</p>
+        <table>
+          <tr><th></th><th>Brand</th><th>Type</th><th>Licensor/agency (verify!)</th><th>Conf.</th><th>Why</th></tr>
+          ${pending
+            .map(
+              (c) => `<tr>
+                <td><select data-brand="${esc(c.brand)}">
+                  <option value="">—</option>
+                  <option value="approve">Approve</option>
+                  <option value="reject">Reject</option>
+                </select></td>
+                <td>${esc(c.brand)}</td>
+                <td>${esc(c.relationship === 'direct_competitor' ? 'Competitor' : 'Analogous')}</td>
+                <td>${esc(c.licensor_or_agency || '?')}${c.licensor_last_verified ? ` <em>(${esc(c.licensor_last_verified)})</em>` : ''}</td>
+                <td>${esc(c.confidence || '')}</td>
+                <td>${esc(c.rationale || '')}</td>
+              </tr>`
+            )
+            .join('')}
+        </table>
+        <p><button class="primary" data-batch="${esc(b.id)}">Submit decisions</button></p>
+        <p class="review-msg" data-msg="${esc(b.id)}"></p>
+      </div>`;
+    }
+
+    async function submitReview(id) {
+      const card = $(`batch-${id}`);
+      const decisions = [...card.querySelectorAll('select[data-brand]')]
+        .filter((s) => s.value)
+        .map((s) => ({ brand: s.dataset.brand, approve: s.value === 'approve' }));
+      if (!decisions.length) return;
+      const msg = card.querySelector(`[data-msg]`);
+      msg.textContent = 'Submitting…';
+      const resp = await fetch('/api/rfp/review', {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({ id, decisions }),
+      });
+      const data = await resp.json();
+      msg.textContent = resp.ok
+        ? `Done — ${data.approved} approved and added to the map.`
+        : `Error: ${data.message || resp.status}`;
+      if (resp.ok) setTimeout(loadPending, 800);
+    }
+
+    $('run-btn').addEventListener('click', async () => {
+      const msg = $('run-msg');
+      const rfpText = $('rfp-text').value.trim();
+      if (rfpText.length < 40) {
+        msg.textContent = 'Paste at least a paragraph of RFP material.';
+        return;
+      }
+      $('run-btn').disabled = true;
+      msg.textContent = 'Running extraction + web search… this can take a couple of minutes.';
+      try {
+        const resp = await fetch('/api/rfp/run', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({
+            rfp_text: rfpText,
+            client_name: $('client-name').value.trim() || undefined,
+            client_hub_id: $('client-hub-id').value.trim() || undefined,
+            lane: $('lane').value || undefined,
+            outcome: $('outcome').value,
+          }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.message || `HTTP ${resp.status}`);
+        msg.textContent = `Found ${data.batch.candidates.length} candidates — review below.`;
+        loadPending();
+      } catch (err) {
+        msg.textContent = `Error: ${err.message}`;
+      } finally {
+        $('run-btn').disabled = false;
+      }
+    });
+
+    secretInput.addEventListener('change', loadPending);
+    loadPending();
+  </script>
+</body>
+</html>

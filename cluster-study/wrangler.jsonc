@@ -1,0 +1,22 @@
+{
+  // Map Engine v2 (Plan Part II) — separate worker name + KV namespace so the
+  // v1 build (cluster-study-worker, the stable demo already shown to Julie)
+  // stays untouched while v2 develops on this branch (II.12).
+  "name": "cluster-study-v2-worker",
+  "main": "src/index.js",
+  "compatibility_date": "2025-01-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "triggers": {
+    "crons": ["30 7 * * *"]
+  },
+  "kv_namespaces": [
+    {
+      "binding": "CLUSTER_KV",
+      "id": "d9279c728d564684b782d8e45827a94a",
+      "remote": true
+    }
+  ]
+}
