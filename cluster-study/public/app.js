@@ -80,6 +80,12 @@ const CULT_RY = 700;
 const DONUT_INNER = 300; // radius of the empty focus stage
 const DONUT_STEP = 44; // outward growth per entity (radiate outward over time)
 const BIZ_PULL_STRENGTH = 0.5; // anchor force pulling filtered matches to center
+// Business donut family grouping (corporate parentage only): children of one
+// parent share a contiguous arc; the parent sits just outside at that arc's
+// angular midpoint so its connector reads as a short radial spoke, never a
+// diagonal across the canvas.
+const FAMILY_ARC_STEP = 0.26; // radians between siblings within a family arc (~15°)
+const FAMILY_PARENT_GAP = 60; // parent sits this far radially beyond its children's arc
 // Business scores use 1 as a universal noise floor (every hub scores 1 on every
 // vertical it doesn't belong to; real membership is 2–5). So "scores on this
 // vertical" means above the floor, not merely > 0 — otherwise every entity pulls.
@@ -514,13 +520,46 @@ function render(graph) {
   const businessRingEntities = graph.nodes.filter(
     (n) => (n.type === 'hub' || n.type === 'parent') && !n.businessHidden
   );
+  const bizRank = new Map(businessRingEntities.map((n, i) => [n.id, i]));
+  // Corporate-family grouping is the ONE scoped exception to "position claims
+  // nothing": parentage is a verified fact (corporate_parents), so a family
+  // reads as a unit instead of scattering a parent diagonally from its child.
+  const bizChildIds = new Set(families.flatMap((f) => f.children.map((c) => c.id)));
+
   function donutPositions() {
     const pos = new Map();
-    businessRingEntities.forEach((n, i) => {
-      const angle = i * 2.399963; // golden angle
-      const r = DONUT_INNER + DONUT_STEP * Math.sqrt(i);
-      pos.set(n.id, { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) });
-    });
+    const place = (id, angle, r) =>
+      pos.set(id, { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) });
+    // Every ring entity's original golden-angle spiral slot (by onboarding rank).
+    const slot = (id) => {
+      const i = bizRank.get(id);
+      return { angle: i * 2.399963, r: DONUT_INNER + DONUT_STEP * Math.sqrt(i) };
+    };
+
+    // Standalone hubs (no parent) keep their exact spiral slot — untouched.
+    for (const n of businessRingEntities) {
+      if (n.type === 'parent' || bizChildIds.has(n.id)) continue;
+      const s = slot(n.id);
+      place(n.id, s.angle, s.r);
+    }
+
+    // Families: children grouped into a contiguous arc centred on the family's
+    // angular home (its earliest-onboarded child's slot); the parent sits just
+    // outside at that same midpoint angle → short, radial connector. Grouping
+    // overrides chronological sub-ordering, so siblings sit by name, not date.
+    for (const fam of families) {
+      const kids = fam.children.filter((c) => bizRank.has(c.id));
+      if (!kids.length) {
+        const s = slot(fam.parent.id); // no visible children — leave parent in place
+        place(fam.parent.id, s.angle, s.r);
+        continue;
+      }
+      const home = slot(kids.reduce((a, b) => (bizRank.get(a.id) <= bizRank.get(b.id) ? a : b)).id);
+      const ordered = [...kids].sort((a, b) => a.name.localeCompare(b.name));
+      const span = (ordered.length - 1) * FAMILY_ARC_STEP;
+      ordered.forEach((c, j) => place(c.id, home.angle - span / 2 + j * FAMILY_ARC_STEP, home.r));
+      place(fam.parent.id, home.angle, home.r + FAMILY_PARENT_GAP);
+    }
     return pos;
   }
 
