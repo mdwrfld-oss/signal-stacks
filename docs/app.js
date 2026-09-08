@@ -73,6 +73,17 @@ const BIZ_RY = 720;
 // Cultural wells: 13 anchor points on an ellipse.
 const CULT_RX = 990;
 const CULT_RY = 700;
+// Business Landscape is a DONUT now (not gravity-blended): entities sit on a
+// phyllotaxis spiral in onboarding order — arbitrary position, no score/
+// category meaning claimed. Empty center = a reserved focus stage the vertical
+// filter pulls matches into. (Cultural is untouched.)
+const DONUT_INNER = 300; // radius of the empty focus stage
+const DONUT_STEP = 44; // outward growth per entity (radiate outward over time)
+const BIZ_PULL_STRENGTH = 0.5; // anchor force pulling filtered matches to center
+// Business scores use 1 as a universal noise floor (every hub scores 1 on every
+// vertical it doesn't belong to; real membership is 2–5). So "scores on this
+// vertical" means above the floor, not merely > 0 — otherwise every entity pulls.
+const BIZ_MATCH_MIN = 2;
 // Cultural spacing: raw proportional weights collapse everyone toward the
 // ellipse centroid (every entity carries some score in most of the 13 wells).
 // Sharpening the weights (score^gamma before normalizing) makes a 5 pull
@@ -97,6 +108,8 @@ const state = {
   dimCompetitors: false, // §4g
   map: 'cultural', // II.2: active landscape (Cultural is the default view)
   isolatedWell: null, // II.3: active cultural gravity-well isolation
+  businessVertical: null, // active business donut filter (pull-to-center)
+  _bizRepin: null, // timer that re-pins the donut after an eased release
   selected: null,
   k: 1,
   effective: new Map(),
@@ -167,8 +180,8 @@ function prepare(graph) {
   });
   for (const n of graph.nodes) {
     n.r = RADII[n.type] || RADII.adjacent;
-    n.rings = ringsFor(n);
     n.isNew = isNewAddition(n, now, state.config);
+    n.rings = ringsFor(n, now, state.config); // white ring ⇐ new-addition only
     const eff = state.effective.get(n.id);
     n.relevance = eff ? eff.relevance : 0;
     n.floor = !n.signal && !eff;
@@ -243,10 +256,10 @@ function prepare(graph) {
       // dominate position, so near-tied profiles stop stacking at the center.
       cultural: normalizeScores(n.cultural_verticals, CULTURAL_VERTICALS, CULT_SCORE_GAMMA),
     };
-    // CAP Phase 2c decision (flagged): the 48 backfill hubs have cultural
-    // scores but NO business_verticals, so nothing positions them on the
-    // Business Landscape — hide them there entirely until a business-vertical
-    // onboarding pass exists. (Only hub nodes; adjacents still place via links.)
+    // A hub only appears on the Business Landscape once it has business_verticals
+    // to position it. As of the full-scoring data pass every hub is scored, so
+    // this now hides nothing — it stays as a guard for any future hub onboarded
+    // without business scores. (Only hub nodes; adjacents still place via links.)
     n.businessHidden = n.type === 'hub' && !n.weights.business;
   }
 }
@@ -360,30 +373,12 @@ function render(graph) {
     .attr('y', (d) => d.y)
     .text((d) => d.label.toUpperCase());
 
-  /* Step 6: business well labels — same faint cartographic treatment, pushed
-     radially outward from center so each sits just beyond its cluster on the
-     ring (all wells are on the perimeter now — no center well). */
-  const BIZ_LABEL_OFFSET = 110;
-  const businessLabelPoints = BUSINESS_VERTICALS.map((v) => {
-    const a = businessAnchors.get(v.id);
-    const dx = a.x - cx;
-    const dy = a.y - cy;
-    const len = Math.hypot(dx, dy) || 1;
-    return { id: v.id, label: v.label, x: a.x + (dx / len) * BIZ_LABEL_OFFSET, y: a.y + (dy / len) * BIZ_LABEL_OFFSET };
-  });
-  businessLabelLayer
-    .selectAll('text')
-    .data(businessLabelPoints)
-    .join('text')
-    .attr('class', 'well-label business')
-    .attr('text-anchor', 'middle')
-    .attr('x', (d) => d.x)
-    .attr('y', (d) => d.y)
-    .text((d) => d.label.toUpperCase());
+  // Business well labels + dividers were gravity-well cartography — removed with
+  // the donut rework (business position no longer means anything; the 11
+  // verticals live in the filter rail instead). Cultural cartography stays.
 
-  /* Items 5/6: sector-divider lines — one faint ray from map center out to
-     each well anchor (business grid + cultural ellipse). Skips the business
-     center well, whose anchor sits on the center point. */
+  /* Cultural sector-divider lines — one faint ray from map center to each
+     cultural well anchor. */
   const dividerEnd = (a) => {
     const dx = a.x - cx;
     const dy = a.y - cy;
@@ -403,7 +398,6 @@ function render(graph) {
       .attr('y1', cy)
       .attr('x2', (d) => d.x)
       .attr('y2', (d) => d.y);
-  drawDividers(businessDividerLayer, businessAnchors);
   drawDividers(culturalDividerLayer, culturalAnchors);
 
   /* Item 7: cultural isolation wedge — a faint filled slice over the isolated
@@ -513,6 +507,23 @@ function render(graph) {
     return pos;
   }
 
+  // Business donut: hubs + parents on a golden-angle spiral in onboarding
+  // order (graph.nodes order — originals then CAP backfill), radiating outward
+  // from an empty center. Position is arbitrary; adjacents still settle around
+  // their hubs via the link force (satellites, unchanged).
+  const businessRingEntities = graph.nodes.filter(
+    (n) => (n.type === 'hub' || n.type === 'parent') && !n.businessHidden
+  );
+  function donutPositions() {
+    const pos = new Map();
+    businessRingEntities.forEach((n, i) => {
+      const angle = i * 2.399963; // golden angle
+      const r = DONUT_INNER + DONUT_STEP * Math.sqrt(i);
+      pos.set(n.id, { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) });
+    });
+    return pos;
+  }
+
   /**
    * Pin the semantic skeleton for one map, settle the free satellites around
    * it (links/charge/collision — §4d/§4e carried over), relax labels, and
@@ -521,7 +532,7 @@ function render(graph) {
    * data → they don't fly.
    */
   function settleMap(mapId, warm) {
-    const pos = semanticPositions(mapId);
+    const pos = mapId === 'business' ? donutPositions() : semanticPositions(mapId);
     for (const n of graph.nodes) {
       const p = pos.get(n.id);
       if (mapId === 'business' && n.businessHidden) {
@@ -564,24 +575,44 @@ function render(graph) {
 
     simulation.alpha(0.9);
     for (let i = 0; i < SETTLE_TICKS; i++) simulation.tick();
-    // Relax pass moves pins too (movePinned): stacked same-profile entities
-    // separate for legibility while staying centered on their shared well —
-    // the fan-out is rendering, not semantics.
-    const relax = forceLabelCollide(true);
+    // Relax pass. Cultural moves pins too (movePinned) to fan out coincident
+    // same-profile entities. The business donut is already collision-spaced by
+    // the spiral, so there movePinned=false — only free satellites (adjacents)
+    // adjust; the pinned ring entities stay exactly on their donut positions.
+    const relax = forceLabelCollide(mapId !== 'business');
     relax.initialize(graph.nodes);
     for (let i = 0; i < 420; i++) relax();
+    // Keep the donut's center clear as the reserved focus stage: push any
+    // business node (satellites of inner-ring hubs) that settled inside the
+    // keep-out radius back out to it.
+    if (mapId === 'business') {
+      const keepOut = DONUT_INNER - 40;
+      for (const n of graph.nodes) {
+        if (n.businessHidden) continue;
+        const dx = n.x - cx;
+        const dy = n.y - cy;
+        const d = Math.hypot(dx, dy);
+        if (d > 0.01 && d < keepOut) {
+          n.x = n.fx = cx + (dx / d) * keepOut;
+          n.y = n.fy = cy + (dy / d) * keepOut;
+        }
+      }
+    }
     // II.4: one ring radius PER CHILD (that child's true distance from the
     // centroid), not a single mean — array length is constant (= children
     // count) across both maps, so the fly-toggle can interpolate index-wise.
     for (const fam of families) {
       const p = pos.get(fam.parent.id);
       fam.ring = fam.ring || {};
-      fam.ring[mapId] = p ? fam.children.map((ch) => Math.hypot(ch.x - p.x, ch.y - p.y)) : [];
+      // No family orbit rings on the arbitrary business donut — cultural only.
+      fam.ring[mapId] = mapId === 'business' ? [] : p ? fam.children.map((ch) => Math.hypot(ch.x - p.x, ch.y - p.y)) : [];
     }
     const snapshot = new Map();
     for (const n of graph.nodes) {
-      // Parked business-hidden nodes stay pinned so they don't drift into view.
-      const pinned = pos.has(n.id) || (mapId === 'business' && n.businessHidden);
+      // Business is a static donut + settled satellites: pin everything so the
+      // ring holds its shape; the vertical filter unpins only its matches to
+      // pull them to center. Cultural keeps its semantic-only pinning.
+      const pinned = mapId === 'business' ? true : pos.has(n.id);
       snapshot.set(n.id, { x: n.x, y: n.y, pinned });
     }
     return snapshot;
@@ -827,6 +858,78 @@ function render(graph) {
     setIsolatedWell(b.dataset.well === state.isolatedWell ? null : b.dataset.well);
   });
 
+  /* Business vertical filter rail (Business Landscape only) — mirrors the
+     cultural rail's visual, single-select. Selecting a vertical pulls every
+     entity that scores on it (business_verticals[well] > 0) to the empty
+     center for inspection via the revived anchor force; non-matching entities
+     stay on the donut, dimmed. Clearing eases matches back to their donut
+     position, then re-pins. No score sub-positioning inside the pulled group —
+     collision + label-relax give an organized scatter for readability only. */
+  const bizRail = document.getElementById('biz-rail');
+  for (const v of BUSINESS_VERTICALS) {
+    const btn = document.createElement('button');
+    btn.dataset.biz = v.id;
+    btn.textContent = v.label;
+    btn.title = `Pull every entity that scores on ${v.label} to the center stage`;
+    bizRail.appendChild(btn);
+  }
+  const bizClearBtn = document.createElement('button');
+  bizClearBtn.className = 'well-clear';
+  bizClearBtn.textContent = 'Clear';
+  bizRail.appendChild(bizClearBtn);
+
+  function applyBusinessFilter() {
+    const w = state.map === 'business' ? state.businessVertical : null;
+    const donut = mapPositions.business;
+    clearTimeout(state._bizRepin);
+    node.each(function (d) {
+      if (d.businessHidden || (d.type !== 'hub' && d.type !== 'parent')) return; // ring entities only
+      const dp = donut.get(d.id);
+      const matches = !!w && d.type === 'hub' && (d.business_verticals?.[w] || 0) >= BIZ_MATCH_MIN;
+      d3.select(this).classed('pulled', matches).classed('filter-dimmed', !!w && !matches);
+      if (matches) {
+        d.fx = null; d.fy = null;          // unpin → anchor force pulls to center
+        d.homeX = cx; d.homeY = cy;
+      } else if (w) {
+        d.fx = dp.x; d.fy = dp.y;          // non-match stays put on the ring
+        d.homeX = dp.x; d.homeY = dp.y;
+      } else {
+        d.fx = null; d.fy = null;          // cleared: unpin so it eases home…
+        d.homeX = dp.x; d.homeY = dp.y;    // …toward its donut position
+      }
+    });
+    simulation.force('x').x((n) => n.homeX).strength(w ? BIZ_PULL_STRENGTH : ANCHOR_STRENGTH);
+    simulation.force('y').y((n) => n.homeY).strength(w ? BIZ_PULL_STRENGTH : ANCHOR_STRENGTH);
+    simulation.alpha(0.75).alphaTarget(0).restart();
+    if (!w) {
+      // Once the eased return has settled, re-pin ring entities at the donut so
+      // the ring is static again (and charge stops jostling them).
+      state._bizRepin = setTimeout(() => {
+        if (state.map !== 'business') return; // switched away mid-ease — skip
+        node.each(function (d) {
+          if (d.businessHidden || (d.type !== 'hub' && d.type !== 'parent')) return;
+          const dp = donut.get(d.id);
+          d.fx = dp.x; d.fy = dp.y; d.homeX = dp.x; d.homeY = dp.y;
+        });
+        simulation.force('x').strength(ANCHOR_STRENGTH);
+        simulation.force('y').strength(ANCHOR_STRENGTH);
+      }, 1500);
+    }
+  }
+  function setBusinessVertical(bizId) {
+    state.businessVertical = bizId;
+    bizRail.querySelectorAll('button[data-biz]').forEach((b) =>
+      b.classList.toggle('active', b.dataset.biz === bizId)
+    );
+    applyBusinessFilter();
+  }
+  bizRail.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b === bizClearBtn) return setBusinessVertical(null);
+    setBusinessVertical(b.dataset.biz === state.businessVertical ? null : b.dataset.biz);
+  });
+
   /* II.3 map accent + rail visibility follow the active landscape; well
      labels and signal vectors are cultural-only (CSS fades on the class). */
   function applyMapChrome(mapId) {
@@ -836,8 +939,11 @@ function render(graph) {
     const clientColorWord = document.getElementById('legend-client-color');
     if (clientColorWord) clientColorWord.textContent = mapId === 'cultural' ? 'yellow' : 'purple';
     rail.classList.toggle('hidden', mapId !== 'cultural');
+    bizRail.classList.toggle('hidden', mapId !== 'business');
     if (mapId !== 'cultural' && state.isolatedWell) setIsolatedWell(null);
-    else applyGlow();
+    // Leaving Business clears its filter (matches ease back on the way out).
+    if (mapId !== 'business' && state.businessVertical) setBusinessVertical(null);
+    applyGlow();
   }
   applyMapChrome(state.map);
 
@@ -852,7 +958,7 @@ function render(graph) {
         .attr('class', `ring-label ${ring}`)
         .attr('text-anchor', 'middle')
         .attr('y', -(rr + 1.5))
-        .text(ring === 'signal' ? 'SIGNAL' : 'SISTER');
+        .text('NEW');
     });
   });
 
@@ -883,18 +989,16 @@ function render(graph) {
   // landscapes have different footprints (grid vs ellipse), so fit follows
   // the map being shown.
   function fitTransform(mapId = state.map) {
-    // Both maps fit their well-label ring into the default view, so the
-    // labels that give placement its meaning are on screen from the start
-    // (wider pad: labels are middle-anchored and extend past their points).
+    // Cultural fits its well-label ring; business fits the donut of node
+    // positions (parked business-hidden nodes excluded so they can't blow up
+    // the fit).
     const pad = 130;
     const pts = [];
     for (const [id, p] of mapPositions[mapId]) {
-      // Item 2: parked (off-canvas) business-hidden nodes must not blow up the
-      // business fit.
       if (mapId === 'business' && state.nodesById.get(id)?.businessHidden) continue;
       pts.push(p);
     }
-    pts.push(...(mapId === 'cultural' ? wellLabelPoints : businessLabelPoints));
+    if (mapId === 'cultural') pts.push(...wellLabelPoints);
     const xs = d3.extent(pts, (p) => p.x);
     const ys = d3.extent(pts, (p) => p.y);
     const dx = xs[1] - xs[0] + pad * 2;

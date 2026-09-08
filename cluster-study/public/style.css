@@ -4,7 +4,7 @@
   --g7-purple: #3a1d6e;
   --g7-purple-light: #e8e0f7;
   --floor-gray: #4b4960; /* contrast pass: lifted so floor reads vs the bg */
-  --ring-signal: #ffffff; /* Fix 2: white — clean accent on any node fill (was teal) */
+  --ring-new: #ffffff; /* white new-addition ring — clean accent on any node fill */
   --ring-sister: #b83a1a; /* II.3 resolved: G7 red (was placeholder yellow) */
   --hull: #8b7dd8;
   --map-accent: #9a6cd3; /* business purple; app.js swaps to #ffd22e on Cultural */
@@ -190,6 +190,10 @@ body { display: flex; flex-direction: column; }
 #canvas:not(.cultural-active) .node.biz-hidden,
 #canvas:not(.cultural-active) .ghost.biz-hidden { display: none; }
 
+/* Business donut: family orbit rings are a cultural/family concept — the
+   arbitrary donut has no such geometry, so hide them on Business. */
+#canvas:not(.cultural-active) .orbit-family { display: none; }
+
 .node { cursor: pointer; }
 /* Contrast pass: a slightly stronger rim so even floor nodes separate from
    the near-black background at rest. */
@@ -223,11 +227,12 @@ body { display: flex; flex-direction: column; }
 }
 
 .ring { fill: none; stroke-width: 2.5px; }
-/* Fix 2: white signal ring reads as a clean accent on white / purple / yellow
-   node fills alike — a thin dark separation keeps it legible even over the
-   white glow of a signal-derived non-client. */
-.ring.signal { stroke: var(--ring-signal); filter: drop-shadow(0 0 1.4px rgba(0, 0, 0, 0.75)); }
-/* Sister-agency ring removed from the render 2026-08-05 (item 2). */
+/* White new-addition ring: renders only during an entity's first week in
+   Cluster Study (date_added ≤ new_addition_days), then drops entirely. A thin
+   dark separation keeps it legible over any node fill or glow. Independent of
+   signals — signal freshness lives in the glow, not this ring. */
+.ring.new-addition { stroke: var(--ring-new); filter: drop-shadow(0 0 1.4px rgba(0, 0, 0, 0.75)); }
+/* Signal ring + sister-agency ring both retired from the render. */
 
 /* §9/§11: new additions pulse brighter for their first week — replaces the
    old red new-addition ring entirely. */
@@ -251,7 +256,7 @@ body { display: flex; flex-direction: column; }
   display: none;
 }
 .zoomed-in .ring-label { display: block; }
-.ring-label.signal { fill: var(--ring-signal); }
+.ring-label.new-addition { fill: var(--ring-new); }
 
 /* §5d typography hierarchy: G7's own roster (hubs/parents) reads prominent;
    competitor/adjacent entities are permanently subordinate — reinforcing the
@@ -290,12 +295,13 @@ body { display: flex; flex-direction: column; }
   opacity: 1;
 }
 
-/* ---- II.3 gravity-well isolation rail (Cultural Landscape only) ---- */
+/* ---- vertical rails: cultural well-isolation + business filter ---- */
 
-/* Fix 1: the bottom splits into two halves — legend fixed on the left,
-   well-rail filling the right half. The 13 wells + Clear reflow and justify
-   across the available width instead of a left-cramped centered stack. */
-#well-rail {
+/* Fix 1: the bottom splits into two halves — legend fixed on the left, the
+   active map's rail filling the right half. Buttons reflow/justify across the
+   width instead of a left-cramped centered stack. Only one rail shows at a
+   time (cultural on Cultural, business on Business). */
+#well-rail, #biz-rail {
   position: absolute;
   bottom: 14px;
   left: 50%;
@@ -311,8 +317,8 @@ body { display: flex; flex-direction: column; }
   padding: 9px 12px;
   z-index: 5;
 }
-#well-rail button { flex: 1 0 auto; text-align: center; }
-#well-rail.hidden { display: none; }
+#well-rail button, #biz-rail button { flex: 1 0 auto; text-align: center; }
+#well-rail.hidden, #biz-rail.hidden { display: none; }
 #well-rail button {
   border: 1px solid rgba(255, 210, 46, 0.25);
   border-radius: 7px;
@@ -329,7 +335,29 @@ body { display: flex; flex-direction: column; }
   font-weight: 700;
   border-color: #ffd22e;
 }
-#well-rail button.well-clear { border-style: dashed; color: var(--muted); }
+#well-rail button.well-clear, #biz-rail button.well-clear { border-style: dashed; color: var(--muted); }
+
+/* Business filter rail — purple (business accent) instead of cultural yellow. */
+#biz-rail button {
+  border: 1px solid rgba(154, 108, 211, 0.3);
+  border-radius: 7px;
+  background: rgba(154, 108, 211, 0.09);
+  color: #cbb8ea;
+  font-size: 11px;
+  padding: 4px 9px;
+  cursor: pointer;
+}
+#biz-rail button:hover { background: rgba(154, 108, 211, 0.22); }
+#biz-rail button.active {
+  background: #9a6cd3;
+  color: #17102a;
+  font-weight: 700;
+  border-color: #9a6cd3;
+}
+
+/* Business donut filter: entities not matching the selected vertical recede
+   on the ring while the matches are pulled to the center stage. */
+.node.filter-dimmed { opacity: 0.16; }
 
 /* ---- panel ---- */
 
@@ -485,7 +513,7 @@ body { display: flex; flex-direction: column; }
 .swatch.client { background: var(--map-accent); box-shadow: 0 0 7px var(--map-accent); }
 .swatch.floor { background: var(--floor-gray); }
 .swatch.ring { background: #fff; border: 2.5px solid; }
-.swatch.ring-signal { border-color: var(--ring-signal); }
+.swatch.ring-new { border-color: var(--ring-new); }
 .swatch.pulse {
   background: radial-gradient(circle, #e6d6ff 0%, #a886ff 45%, transparent 75%);
   animation: new-pulse 2.6s ease-in-out infinite;

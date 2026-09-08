@@ -77,6 +77,10 @@ export function buildGraphFromSeed(seed) {
       parent: null,
       business_verticals: hub.business_verticals || null,
       cultural_verticals: hub.cultural_verticals || null,
+      // Per-category rubric objects (Historical Depth, Recurrence, … Sources) for
+      // the panel's rubric accordion. Data-only for now — carried through so it's
+      // present when the accordion is wired; not yet read by any renderer.
+      cultural_rubric: hub.cultural_rubric || null,
       is_g7_client: !!hub.is_g7_client,
       sister_agency: hub.sister_agency === true,
       confidence: hub.confidence || null,

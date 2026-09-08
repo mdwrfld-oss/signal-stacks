@@ -10,11 +10,11 @@ import {
 } from '../public/verticals.js';
 
 describe('taxonomies (final scored-data schema)', () => {
-  it('has 9 business wells and 13 cultural wells matching the seed keys exactly', () => {
-    expect(BUSINESS_VERTICALS.length).toBe(9);
+  it('has 11 business wells and 13 cultural wells matching the seed keys exactly', () => {
+    expect(BUSINESS_VERTICALS.length).toBe(11);
     expect(CULTURAL_VERTICALS.length).toBe(13);
     const bizIds = BUSINESS_VERTICALS.map((v) => v.id);
-    for (const id of ['beauty_retail', 'media_social_platforms', 'entertainment']) {
+    for (const id of ['beauty_retail', 'media_social_platforms', 'entertainment', 'apparel_fashion', 'insurance_financial']) {
       expect(bizIds).toContain(id);
     }
     const cultIds = CULTURAL_VERTICALS.map((v) => v.id);
@@ -27,19 +27,17 @@ describe('taxonomies (final scored-data schema)', () => {
     const bizIds = new Set(BUSINESS_VERTICALS.map((v) => v.id));
     const cultIds = new Set(CULTURAL_VERTICALS.map((v) => v.id));
     for (const hub of seed.hub_nodes) {
-      // Every hub has complete cultural scoring; only the original roster has
-      // business_verticals (the CAP Phase 2c backfill entities are cultural-only).
+      // Every hub now carries complete cultural AND business scoring — the CAP
+      // Phase 2c backfill entities were fully scored on business this round.
       expect(Object.keys(hub.cultural_verticals).sort()).toEqual([...cultIds].sort());
-      if (hub.business_verticals) {
-        expect(Object.keys(hub.business_verticals).sort()).toEqual([...bizIds].sort());
-      }
+      expect(Object.keys(hub.business_verticals).sort()).toEqual([...bizIds].sort());
     }
   });
 
-  it('the CAP Phase 2c backfill entities are cultural-only (no business_verticals)', () => {
+  it('the CAP Phase 2c backfill entities now carry complete business scoring too', () => {
     const prov = seed.hub_nodes.filter((h) => h.confidence === 'provisional_bootstrap');
     expect(prov.length).toBe(48);
-    expect(prov.every((h) => h.cultural_verticals && !h.business_verticals)).toBe(true);
+    expect(prov.every((h) => h.cultural_verticals && h.business_verticals)).toBe(true);
   });
 });
 
@@ -108,17 +106,17 @@ describe('centroid (II.4 parent position rule)', () => {
 describe('graph integration (final scored data)', () => {
   const graph = buildGraphFromSeed(seed);
 
-  it('all 67 hubs carry cultural scoring; the original roster also carries business (legacy vertical gone)', () => {
+  it('all 67 hubs carry complete cultural AND business scoring (legacy vertical gone)', () => {
     const hubs = graph.nodes.filter((n) => n.type === 'hub');
     expect(hubs.length).toBe(67);
     const withBiz = hubs.filter((h) => h.business_verticals);
-    expect(withBiz.length).toBe(19); // original roster only; 48 CAP entities are cultural-only
+    expect(withBiz.length).toBe(67); // every hub is now fully scored on business
     for (const h of hubs) {
       expect(Object.keys(h.cultural_verticals).length).toBe(13);
       expect(h.vertical).toBeUndefined();
     }
     for (const h of withBiz) {
-      expect(Object.keys(h.business_verticals).length).toBe(9);
+      expect(Object.keys(h.business_verticals).length).toBe(11);
     }
   });
 

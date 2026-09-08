@@ -115,22 +115,30 @@ export function isFloorState(node, effective) {
 }
 
 /**
- * Ring types — currently a single ring:
- * - 'signal' (white): ANY active direct signal — Signal Stacks detection or
- *   RFP-sourced event. Reads as a clean accent on any node fill.
- * The sister-agency ring (formerly #B83A1A on sister_agency nodes) was
- * REMOVED from the render 2026-08-05 — no replacement decided yet; the
- * sister_agency flag stays in the data, just isn't drawn as a ring.
- * New additions get a brighter pulsing glow, not a ring (§9/§11). Direct
- * signals only — inherited/propagated signals get fill, not rings.
+ * Ring types — a single ring:
+ * - 'new-addition' (white): the entity is inside its first week in Cluster
+ *   Study (date_added within new_addition_days). Binary — the ring renders
+ *   for exactly that window, then drops entirely (no dimmed residue after).
+ *
+ * This ring is deliberately INDEPENDENT of signals. Signal presence and
+ * freshness are carried entirely by the node's glow (signalGlowFraction),
+ * never by this ring — the two answer different questions and are driven by
+ * two separate dates:
+ *   ring  ← date_added     ("is this entity new to our database?" — 1 week)
+ *   glow  ← signal.date    ("how fresh is its latest signal?" — 24 weeks)
+ * So a brand-new entity with no signal yet rings (with minimal glow), and a
+ * long-standing entity with a signal from yesterday glows strongly but shows
+ * no ring. Both states, and everything between, are possible at once.
+ * (The old signal ring and sister-agency ring are both retired from the
+ * render; sister_agency stays in the data, just isn't drawn.)
  */
-export function ringsFor(node) {
+export function ringsFor(node, nowMs, config = DEFAULT_CONFIG) {
   const rings = [];
-  if (node.signal) rings.push('signal');
+  if (isNewAddition(node, nowMs, config)) rings.push('new-addition');
   return rings;
 }
 
-/** New addition within its first week (§9/§11) — rendered as a pulsing glow. */
+/** New addition within its first week (§9/§11) — drives the white ring. */
 export function isNewAddition(node, nowMs, config = DEFAULT_CONFIG) {
   if (!node.date_added) return false;
   const addedMs = Date.parse(node.date_added);

@@ -27,6 +27,8 @@ export const BUSINESS_VERTICALS = [
   { id: 'beauty_retail', label: 'Beauty & Retail' },
   { id: 'media_social_platforms', label: 'Media & Social Platforms' },
   { id: 'entertainment', label: 'Entertainment' },
+  { id: 'apparel_fashion', label: 'Apparel & Fashion' },
+  { id: 'insurance_financial', label: 'Insurance & Financial' },
 ];
 
 export const CULTURAL_VERTICALS = [

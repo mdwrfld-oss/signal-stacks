@@ -199,25 +199,34 @@ describe('familySteps', () => {
   });
 });
 
-describe('rings (simplified two-ring model, §9 revision + §5a.1)', () => {
-  it('gives ANY direct signal the unified Signal ring — RFP events included', () => {
-    expect(ringsFor({ signal: { strength: 1, date: daysAgo(1), type: 'signal_stacks' } })).toEqual(['signal']);
-    expect(ringsFor({ signal: { strength: 1, date: daysAgo(1), type: 'rfp' } })).toEqual(['signal']);
+describe('rings (single new-addition ring — date_added driven)', () => {
+  it('renders the white ring only during the first week (date_added ≤ new_addition_days)', () => {
+    expect(ringsFor({ date_added: daysAgo(1) }, NOW)).toEqual(['new-addition']);
+    expect(ringsFor({ date_added: daysAgo(3) }, NOW)).toEqual(['new-addition']);
+    expect(ringsFor({ date_added: daysAgo(10) }, NOW)).toEqual([]); // past first week: ring drops entirely
+  });
+
+  it('is independent of signals — a signal never draws a ring (that is the glow’s job)', () => {
+    // fresh signal, no recent date_added → glow, but NO ring
+    expect(ringsFor({ signal: { strength: 1, date: daysAgo(1), type: 'signal_stacks' } }, NOW)).toEqual([]);
+    expect(
+      ringsFor({ signal: { strength: 1, date: daysAgo(1), type: 'rfp' }, date_added: daysAgo(200) }, NOW)
+    ).toEqual([]);
+    // brand-new entity with NO signal yet → still rings
+    expect(ringsFor({ signal: null, date_added: daysAgo(2) }, NOW)).toEqual(['new-addition']);
+  });
+
+  it('gives floor-state nodes (no signal, no recent date_added) no rings', () => {
+    expect(ringsFor({ signal: null }, NOW)).toEqual([]);
+    expect(ringsFor({ signal: null, date_added: daysAgo(30) }, NOW)).toEqual([]);
   });
 
   it('no longer renders a sister-agency ring (removed 2026-08-05; flag stays in data)', () => {
-    expect(ringsFor({ signal: null, sister_agency: true })).toEqual([]);
-    expect(ringsFor({ signal: { strength: 1, date: daysAgo(1), type: 'rfp' }, sister_agency: true })).toEqual([
-      'signal',
-    ]);
+    expect(ringsFor({ sister_agency: true }, NOW)).toEqual([]);
+    expect(ringsFor({ sister_agency: true, date_added: daysAgo(2) }, NOW)).toEqual(['new-addition']);
   });
 
-  it('gives floor-state nodes no rings, and never a new-addition ring', () => {
-    expect(ringsFor({ signal: null })).toEqual([]);
-    expect(ringsFor({ signal: null, date_added: daysAgo(1) })).toEqual([]);
-  });
-
-  it('isNewAddition marks the first week only (pulsing glow, not a ring)', () => {
+  it('isNewAddition marks the first week only', () => {
     expect(isNewAddition({ date_added: daysAgo(3) }, NOW)).toBe(true);
     expect(isNewAddition({ date_added: daysAgo(10) }, NOW)).toBe(false);
     expect(isNewAddition({}, NOW)).toBe(false);
