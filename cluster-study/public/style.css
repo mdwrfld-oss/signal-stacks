@@ -486,6 +486,93 @@ body { display: flex; flex-direction: column; }
   letter-spacing: 0.06em;
 }
 
+/* ---- manual overrides (human corrections) ---- */
+
+/* Cultural accordion row + edit affordance sit on one line; the correction form
+   drops below the whole row. Business rows mirror the same structure. */
+.cult-row-head { display: flex; align-items: center; gap: 4px; }
+.cult-row-head .cult-row { flex: 1; min-width: 0; }
+.score-list { margin: 4px 0; }
+.score-row { display: flex; align-items: center; gap: 6px; font-size: 13px; padding: 2px 0; }
+.score-row .score-name { flex: 1; min-width: 0; }
+
+.override-edit {
+  flex: 0 0 auto;
+  background: none;
+  border: 1px solid rgba(139, 125, 216, 0.3);
+  color: var(--g7-purple-light);
+  border-radius: 5px;
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+.override-edit:hover { background: rgba(139, 125, 216, 0.18); }
+
+/* A corrected value reads as HIGHER confidence — checked by a person. Green,
+   with a check, distinct from the automated white/gray/purple scores. */
+.verified-badge {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 1px 6px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #0b1f14;
+  background: #4fd08a;
+  border: 1px solid #66e3a0;
+  cursor: help;
+  vertical-align: middle;
+}
+
+.override-form {
+  margin: 4px 0 10px;
+  padding: 9px 10px;
+  background: rgba(139, 125, 216, 0.08);
+  border: 1px solid rgba(139, 125, 216, 0.25);
+  border-radius: 8px;
+}
+.override-form.hidden { display: none; }
+.override-context { font-size: 11.5px; color: var(--muted); margin-bottom: 7px; }
+.override-context strong { color: var(--text); }
+.override-fields { display: flex; flex-direction: column; gap: 6px; }
+.override-fields label { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--muted); }
+.override-fields input {
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(139, 125, 216, 0.3);
+  border-radius: 5px;
+  color: var(--text);
+  padding: 5px 7px;
+  font-size: 13px;
+}
+.override-fields input.override-value { width: 70px; }
+.override-actions { display: flex; gap: 7px; margin-top: 9px; }
+.override-apply {
+  background: #4fd08a;
+  border: none;
+  color: #0b1f14;
+  font-weight: 700;
+  border-radius: 6px;
+  padding: 5px 11px;
+  cursor: pointer;
+}
+.override-cancel {
+  background: none;
+  border: 1px solid rgba(139, 125, 216, 0.3);
+  color: var(--muted);
+  border-radius: 6px;
+  padding: 5px 11px;
+  cursor: pointer;
+}
+.override-status:empty { display: none; }
+.override-status { margin: 7px 0 0; }
+
+/* Corrected radar spike: green (verified) instead of the yellow research spike,
+   with a dot at the apex so it reads apart at a glance. */
+.radar-spike--verified { fill: rgba(79, 208, 138, 0.8); stroke: #4fd08a; }
+.radar-verified-dot { fill: #66e3a0; stroke: #0b1f14; stroke-width: 0.6; }
+
 /* II.14 ghost mode — dim duplicate at prior position + fading connector. */
 .ghost-node { fill: rgba(154, 146, 184, 0.28); stroke: none; }
 .ghost-link { stroke: rgba(154, 146, 184, 0.3); stroke-width: 1; stroke-dasharray: 3 4; }

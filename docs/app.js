@@ -24,6 +24,9 @@ import {
   isNewAddition,
   arrowDecayLevel,
   signalGlowFraction,
+  fieldValue,
+  resolvedValue,
+  isOverridden,
 } from './scoring.js';
 import {
   BUSINESS_VERTICALS,
@@ -1408,8 +1411,8 @@ function showPanel(d) {
   /* Step 7: radar (spike burst) + cultural accordion sit at the top, right
      under the header — the entity's cultural profile at a glance. */
   if (d.cultural_verticals) {
-    parts.push(radarSpikeBurst(d.cultural_verticals));
-    parts.push(culturalAccordion(d.cultural_verticals));
+    parts.push(radarSpikeBurst(d));
+    parts.push(culturalAccordion(d));
   }
 
   /* relevance / signal state */
@@ -1455,18 +1458,10 @@ function showPanel(d) {
     parts.push('</ul>');
   }
 
-  /* II.1 vertical profiles — displayed as 0–5 (stored as normalized weights) */
-  const profileSection = (title, scores, taxonomy) => {
-    const rows = taxonomy
-      .filter((v) => (scores?.[v.id] || 0) > 0)
-      .sort((a, b) => scores[b.id] - scores[a.id])
-      .map((v) => `<li>${esc(v.label)} — <strong>${esc(scores[v.id])}</strong>/5</li>`);
-    if (rows.length) parts.push(`<h3>${title}</h3><ul>${rows.join('')}</ul>`);
-  };
-  // Cultural profile is the radar + accordion above; only the business list
-  // stays as text (no business radar this pass).
+  // Cultural profile is the radar + accordion above; the business profile is an
+  // editable list (every vertical, correctable). Both resolve manual overrides.
   if (d.business_verticals) {
-    profileSection('Business profile (0–5)', d.business_verticals, BUSINESS_VERTICALS);
+    parts.push(businessProfile(d));
   }
 
   /* notes */
@@ -1540,6 +1535,7 @@ function showPanel(d) {
   panelContent.innerHTML = parts.join('');
   panel.classList.remove('hidden');
   wireGenerateCompetitors(d);
+  wireOverrideForms(d);
 }
 
 /**
@@ -1643,7 +1639,7 @@ const WELL_SHORT = {
  * standalone triangle so a high score on one well never visually "fills in"
  * toward its neighbors.
  */
-function radarSpikeBurst(scores) {
+function radarSpikeBurst(d) {
   const size = 300;
   const cx0 = size / 2;
   const cy0 = 148;
@@ -1661,7 +1657,12 @@ function radarSpikeBurst(scores) {
     parts.push(
       `<line class="radar-axis" x1="${cx0}" y1="${cy0}" x2="${(cx0 + cos * maxR).toFixed(1)}" y2="${(cy0 + sin * maxR).toFixed(1)}" />`
     );
-    const s = Math.max(0, Math.min(5, Number(scores[v.id]) || 0));
+    // Spike length reads the DISPLAYED (override-resolved) value; a corrected
+    // spike renders distinctly + gets an apex dot so a human-checked score reads
+    // apart from an automated one at a glance.
+    const fp = `cultural_verticals.${v.id}`;
+    const s = Math.max(0, Math.min(5, Number(resolvedValue(d, fp)) || 0));
+    const verified = isOverridden(d, fp);
     if (s > 0) {
       const r = (s / 5) * maxR;
       const apexX = cx0 + cos * r;
@@ -1670,8 +1671,11 @@ function radarSpikeBurst(scores) {
       const px = -sin * bw;
       const py = cos * bw;
       parts.push(
-        `<path class="radar-spike" d="M${(cx0 + px).toFixed(1)},${(cy0 + py).toFixed(1)} L${apexX.toFixed(1)},${apexY.toFixed(1)} L${(cx0 - px).toFixed(1)},${(cy0 - py).toFixed(1)} Z" />`
+        `<path class="radar-spike${verified ? ' radar-spike--verified' : ''}" d="M${(cx0 + px).toFixed(1)},${(cy0 + py).toFixed(1)} L${apexX.toFixed(1)},${apexY.toFixed(1)} L${(cx0 - px).toFixed(1)},${(cy0 - py).toFixed(1)} Z" />`
       );
+      if (verified) {
+        parts.push(`<circle class="radar-verified-dot" cx="${apexX.toFixed(1)}" cy="${apexY.toFixed(1)}" r="3.2" />`);
+      }
     }
     const lx = cx0 + cos * (maxR + 11);
     const ly = cy0 + sin * (maxR + 11);
@@ -1696,13 +1700,140 @@ const RUBRIC_SUBFACTORS = [
  * score). Expanding reveals the five rubric sub-factors, each 'pending': the
  * Cultural Affinity Processor will populate them. No fabricated numbers.
  */
-function culturalAccordion(scores) {
+function culturalAccordion(d) {
   const rows = CULTURAL_VERTICALS.map((v) => {
-    const s = Math.max(0, Math.min(5, Number(scores[v.id]) || 0));
+    const fp = `cultural_verticals.${v.id}`;
+    const s = Math.max(0, Math.min(5, Number(resolvedValue(d, fp)) || 0));
     const subs = RUBRIC_SUBFACTORS.map(
       (r) => `<div class="rubric-row"><span>${esc(r)}</span><span class="pending">pending</span></div>`
     ).join('');
-    return `<details class="cult-row"><summary><span class="cult-name">${esc(v.label)}</span><span class="cult-score">${s}/5</span></summary><div class="rubric">${subs}<p class="rel-note">Populates once the Cultural Affinity Processor is live.</p></div></details>`;
+    return `<div class="cult-row-wrap"><div class="cult-row-head"><details class="cult-row"><summary><span class="cult-name">${esc(v.label)}</span><span class="cult-score">${s}/5${overrideBadge(d, fp)}</span></summary><div class="rubric">${subs}<p class="rel-note">Populates once the Cultural Affinity Processor is live.</p></div></details>${editButton(fp)}</div>${overrideForm(d, fp)}</div>`;
   }).join('');
   return `<h3>Cultural categories</h3><div class="accordion">${rows}</div>`;
+}
+
+/* II.1 business profile — every vertical shown as an editable, correctable row. */
+function businessProfile(d) {
+  const val = (id) => Number(resolvedValue(d, `business_verticals.${id}`)) || 0;
+  const rows = [...BUSINESS_VERTICALS]
+    .sort((a, b) => val(b.id) - val(a.id))
+    .map((v) => {
+      const fp = `business_verticals.${v.id}`;
+      const s = Math.max(0, Math.min(5, val(v.id)));
+      return `<div class="score-row-wrap"><div class="score-row"><span class="score-name">${esc(v.label)} — <strong>${s}</strong>/5${overrideBadge(d, fp)}</span>${editButton(fp)}</div>${overrideForm(d, fp)}</div>`;
+    })
+    .join('');
+  return `<h3>Business profile (0–5)</h3><div class="score-list">${rows}</div>`;
+}
+
+/* ---- manual override (human correction) affordances in the panel ---- */
+
+// Reads as HIGHER confidence than an automated score — this value was checked
+// by a person. Tooltip carries the full provenance (who/when/original/reason).
+function overrideBadge(d, fieldPath) {
+  if (!isOverridden(d, fieldPath)) return '';
+  const ov = d.manual_overrides[fieldPath];
+  const who = ov.corrected_by ? esc(ov.corrected_by) : 'a team member';
+  const when = ov.corrected_date ? esc(String(ov.corrected_date).slice(0, 10)) : '';
+  const orig = ov.original_value ?? '—';
+  const reason = ov.reason ? ` — “${esc(ov.reason)}”` : '';
+  const title = `Manually verified by ${who}${when ? ' on ' + when : ''} · researched value was ${esc(orig)}/5${reason}`;
+  return ` <span class="verified-badge" title="${title}">✓ Verified</span>`;
+}
+
+function editButton(fieldPath) {
+  return `<button type="button" class="override-edit" data-field="${esc(fieldPath)}" title="Correct this score" aria-label="Correct this score">✎</button>`;
+}
+
+// Inline correction form: current researched value (kept), corrected value, and
+// an optional reason. Submitting never overwrites the researched value — it
+// records a correction alongside it.
+function overrideForm(d, fieldPath) {
+  const researched = fieldValue(d, fieldPath);
+  const cur = resolvedValue(d, fieldPath);
+  const ov = d.manual_overrides && d.manual_overrides[fieldPath];
+  const prev = ov
+    ? ` · current correction <strong>${esc(ov.corrected_value)}</strong>/5${ov.corrected_by ? ' by ' + esc(ov.corrected_by) : ''}`
+    : '';
+  return `<div class="override-form hidden" data-field="${esc(fieldPath)}">
+    <div class="override-context">Researched value <strong>${researched ?? '—'}</strong>/5${prev}. The original research stays on record.</div>
+    <div class="override-fields">
+      <label>Corrected value <input type="number" class="override-value" min="0" max="5" step="1" value="${esc(cur ?? researched ?? 0)}" /></label>
+      <label>Reason <input type="text" class="override-reason" placeholder="optional note" value="${ov && ov.reason ? esc(ov.reason) : ''}" /></label>
+    </div>
+    <div class="override-actions"><button type="button" class="override-apply">Apply correction</button><button type="button" class="override-cancel">Cancel</button></div>
+    <p class="override-status rel-note"></p>
+  </div>`;
+}
+
+function wireOverrideForms(d) {
+  const forms = () => panelContent.querySelectorAll('.override-form');
+  panelContent.querySelectorAll('.override-edit').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation(); // don't toggle the enclosing <details>
+      const form = panelContent.querySelector(`.override-form[data-field="${btn.dataset.field}"]`);
+      const open = form && form.classList.contains('hidden');
+      forms().forEach((f) => f.classList.add('hidden'));
+      if (open) {
+        form.classList.remove('hidden');
+        form.querySelector('.override-value')?.focus();
+      }
+    });
+  });
+  panelContent.querySelectorAll('.override-cancel').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      btn.closest('.override-form').classList.add('hidden');
+    });
+  });
+  panelContent.querySelectorAll('.override-apply').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      submitOverride(d, btn.closest('.override-form'));
+    });
+  });
+}
+
+// POST the correction, then apply the persisted record in memory and re-render.
+// Identity (corrected_by) is stored once per browser; auth reuses the trigger
+// secret shared with Generate Competitors. No approval workflow — attribution
+// is the only safeguard (by design, this pass).
+async function submitOverride(d, form) {
+  const fieldPath = form.dataset.field;
+  const status = form.querySelector('.override-status');
+  const cv = Number(form.querySelector('.override-value').value);
+  const reason = form.querySelector('.override-reason').value.trim();
+  if (!Number.isInteger(cv) || cv < 0 || cv > 5) {
+    status.textContent = 'Corrected value must be a whole number 0–5.';
+    return;
+  }
+  let editor = localStorage.getItem('cluster_editor');
+  if (!editor) {
+    editor = (window.prompt('Your name or initials (saved in this browser for correction attribution):') || '').trim();
+    if (!editor) return;
+    localStorage.setItem('cluster_editor', editor);
+  }
+  let secret = localStorage.getItem('cluster_secret');
+  if (!secret) {
+    secret = (window.prompt('Trigger secret (stored in this browser):') || '').trim();
+    if (!secret) return;
+    localStorage.setItem('cluster_secret', secret);
+  }
+  status.textContent = 'Saving…';
+  try {
+    const resp = await fetch('/api/override', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
+      body: JSON.stringify({ node_id: d.id, field_path: fieldPath, corrected_value: cv, corrected_by: editor, reason }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || data.message || `HTTP ${resp.status}`);
+    if (!d.manual_overrides) d.manual_overrides = {};
+    d.manual_overrides[fieldPath] = data.override; // the persisted record
+    showPanel(d); // re-render with the correction + badge live
+  } catch (err) {
+    status.textContent = `Error: ${err.message}`;
+    if (/HTTP 401/.test(err.message)) localStorage.removeItem('cluster_secret');
+  }
 }

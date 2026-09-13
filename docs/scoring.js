@@ -188,3 +188,52 @@ export function signalGlowFraction(signal, nowMs) {
   const days = Math.max(0, (nowMs - signalMs) / MS_PER_DAY);
   return Math.max(0, 1 - days / SIGNAL_WINDOW_DAYS);
 }
+
+/* ----------------------------------------- manual overrides (human corrections)
+ *
+ * A team member can correct a cultural/business vertical score before the CAP
+ * automation goes live. Corrections are NON-DESTRUCTIVE: the researched value in
+ * cultural_verticals / business_verticals is never touched. Each correction is a
+ * record in a sibling `manual_overrides` map keyed by field path, e.g.
+ *   "cultural_verticals.sports": {
+ *     original_value, corrected_value, corrected_by, corrected_date, reason,
+ *     automation_may_override
+ *   }
+ * The displayed value resolves to corrected_value; the original stays inspectable.
+ * `automation_may_override` defaults false — the future CAP pipeline checks it
+ * before writing to a field (pipeline-side logic is NOT built here).
+ */
+
+/** A field path is "<object>.<key>", e.g. "cultural_verticals.sports". */
+export function fieldValue(node, fieldPath) {
+  if (!node || typeof fieldPath !== 'string') return undefined;
+  const dot = fieldPath.indexOf('.');
+  if (dot < 0) return undefined;
+  const obj = node[fieldPath.slice(0, dot)];
+  return obj ? obj[fieldPath.slice(dot + 1)] : undefined;
+}
+
+/** Build a correction record. original_value is the researched value being corrected. */
+export function makeOverrideRecord(originalValue, correctedValue, correctedBy, reason, nowIso) {
+  return {
+    original_value: originalValue ?? null,
+    corrected_value: correctedValue,
+    corrected_by: correctedBy || null,
+    corrected_date: nowIso || new Date().toISOString(),
+    reason: (reason && String(reason).trim()) || null,
+    // Defaults false on every new correction — the CAP pipeline reads this flag
+    // before it may write over a field. Pipeline-side logic lives elsewhere.
+    automation_may_override: false,
+  };
+}
+
+/** The value to DISPLAY for a field: the human correction if one exists, else the researched value. */
+export function resolvedValue(node, fieldPath) {
+  const ov = node && node.manual_overrides && node.manual_overrides[fieldPath];
+  return ov ? ov.corrected_value : fieldValue(node, fieldPath);
+}
+
+/** True when a human correction exists for this field. */
+export function isOverridden(node, fieldPath) {
+  return !!(node && node.manual_overrides && node.manual_overrides[fieldPath]);
+}

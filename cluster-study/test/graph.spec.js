@@ -8,6 +8,10 @@ import {
   ringsFor,
   isNewAddition,
   DEFAULT_CONFIG,
+  fieldValue,
+  makeOverrideRecord,
+  resolvedValue,
+  isOverridden,
 } from '../public/scoring.js';
 
 const NOW = Date.parse('2026-07-08T12:00:00Z');
@@ -252,5 +256,66 @@ describe('mergeOverlay', () => {
     expect(base.nodes.find((n) => n.id === 'white_claw').name).toBe('White Claw');
     expect(base.links.some((l) => l.target === 'toyota_crown' && l.source === 'subaru')).toBe(true);
     expect(base.links.some((l) => l.source === 'nope')).toBe(false);
+  });
+
+  it('merges manual-override records onto existing nodes without touching researched scores', () => {
+    const base = buildGraphFromSeed(seed);
+    const wc = base.nodes.find((n) => n.id === 'white_claw');
+    const researched = wc.cultural_verticals.sports; // untouched original
+    const overlay = {
+      overrides: {
+        white_claw: {
+          'cultural_verticals.sports': makeOverrideRecord(researched, researched + 1, 'JG', 'confirmed', '2026-09-01T00:00:00Z'),
+        },
+      },
+    };
+    mergeOverlay(base, overlay);
+    // researched value is NOT overwritten; the correction lives alongside it
+    expect(wc.cultural_verticals.sports).toBe(researched);
+    expect(wc.manual_overrides['cultural_verticals.sports'].corrected_value).toBe(researched + 1);
+    expect(wc.manual_overrides['cultural_verticals.sports'].original_value).toBe(researched);
+    // the displayed value resolves to the correction
+    expect(resolvedValue(wc, 'cultural_verticals.sports')).toBe(researched + 1);
+  });
+});
+
+describe('manual overrides (human corrections)', () => {
+  it('reads a value by field path', () => {
+    const node = { cultural_verticals: { sports: 3 }, business_verticals: { cpgs: 5 } };
+    expect(fieldValue(node, 'cultural_verticals.sports')).toBe(3);
+    expect(fieldValue(node, 'business_verticals.cpgs')).toBe(5);
+    expect(fieldValue(node, 'cultural_verticals.missing')).toBe(undefined);
+    expect(fieldValue(node, 'garbage')).toBe(undefined);
+  });
+
+  it('builds a non-destructive record that defaults automation_may_override to false', () => {
+    const rec = makeOverrideRecord(3, 4, 'JG', 'saw the deck', '2026-09-01T12:00:00Z');
+    expect(rec).toEqual({
+      original_value: 3,
+      corrected_value: 4,
+      corrected_by: 'JG',
+      corrected_date: '2026-09-01T12:00:00Z',
+      reason: 'saw the deck',
+      automation_may_override: false,
+    });
+    // blank reason normalizes to null; missing original tolerated
+    expect(makeOverrideRecord(undefined, 2, '', '   ', '2026-09-01T12:00:00Z')).toMatchObject({
+      original_value: null,
+      corrected_by: null,
+      reason: null,
+      automation_may_override: false,
+    });
+  });
+
+  it('resolves the displayed value to the correction, and reports override presence', () => {
+    const node = {
+      cultural_verticals: { sports: 3 },
+      manual_overrides: { 'cultural_verticals.sports': { corrected_value: 5 } },
+    };
+    expect(resolvedValue(node, 'cultural_verticals.sports')).toBe(5);
+    expect(isOverridden(node, 'cultural_verticals.sports')).toBe(true);
+    expect(resolvedValue(node, 'cultural_verticals.gaming')).toBe(undefined);
+    expect(isOverridden(node, 'cultural_verticals.gaming')).toBe(false);
+    expect(isOverridden({ cultural_verticals: { sports: 3 } }, 'cultural_verticals.sports')).toBe(false);
   });
 });

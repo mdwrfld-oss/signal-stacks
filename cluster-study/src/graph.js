@@ -81,6 +81,10 @@ export function buildGraphFromSeed(seed) {
       // the panel's rubric accordion. Data-only for now — carried through so it's
       // present when the accordion is wired; not yet read by any renderer.
       cultural_rubric: hub.cultural_rubric || null,
+      // Human corrections to vertical scores, keyed by field path. Non-destructive
+      // (the researched values above are never touched). Seeded corrections are
+      // rare; the live path is the overlay merged at /data read time.
+      manual_overrides: hub.manual_overrides || null,
       is_g7_client: !!hub.is_g7_client,
       sister_agency: hub.sister_agency === true,
       confidence: hub.confidence || null,
@@ -249,7 +253,12 @@ export function buildGraphFromSheet(nodeRows, relRows) {
  * (Sheet/seed) is the source of truth; overlay links to existing nodes are kept.
  */
 export function mergeOverlay(graph, overlay) {
-  if (!overlay || (!overlay.nodes?.length && !overlay.links?.length)) return graph;
+  if (
+    !overlay ||
+    (!overlay.nodes?.length && !overlay.links?.length && !overlay.overrides)
+  ) {
+    return graph;
+  }
   const ids = new Set(graph.nodes.map((n) => n.id));
   for (const node of overlay.nodes || []) {
     if (ids.has(node.id)) continue;
@@ -260,6 +269,16 @@ export function mergeOverlay(graph, overlay) {
     if (!ids.has(typeof link.source === 'object' ? link.source.id : link.source)) continue;
     if (!ids.has(typeof link.target === 'object' ? link.target.id : link.target)) continue;
     graph.links.push(link);
+  }
+  // Human corrections live entirely in the overlay so the researched base graph
+  // is never mutated. Merge each node's { fieldPath: record } onto manual_overrides.
+  if (overlay.overrides) {
+    const byId = new Map(graph.nodes.map((n) => [n.id, n]));
+    for (const [nodeId, fields] of Object.entries(overlay.overrides)) {
+      const node = byId.get(nodeId);
+      if (!node || !fields) continue;
+      node.manual_overrides = { ...(node.manual_overrides || {}), ...fields };
+    }
   }
   return graph;
 }

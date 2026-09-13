@@ -9,6 +9,7 @@
 
 import seedData from '../G7_Cluster_Study_Seed_Data.json';
 import { buildGraphFromSeed, mergeOverlay } from './graph.js';
+import { fieldValue, makeOverrideRecord } from '../public/scoring.js';
 import { ingestSheet, GRAPH_KEY } from './sheets.js';
 import {
   createPendingBatch,
@@ -120,6 +121,47 @@ export default {
         return json({ status: 'ok', ...result });
       } catch (err) {
         console.error(`[Cluster] Generate Competitors failed: ${err.message}`);
+        return json({ status: 'error', message: err.message }, 500);
+      }
+    }
+
+    // Manual correction to a cultural/business vertical score. Non-destructive:
+    // the researched base graph is never written — the correction record lives in
+    // the overlay (merged at /data read time). original_value is read from the
+    // pristine base so it always captures the researched value being corrected.
+    if (url.pathname === '/api/override' && request.method === 'POST') {
+      if (!authorized(request, env)) return new Response('Unauthorized', { status: 401 });
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return json({ error: 'Invalid JSON body' }, 400);
+      }
+      const { node_id, field_path, corrected_value, corrected_by, reason } = body || {};
+      if (!node_id || typeof field_path !== 'string') {
+        return json({ error: 'node_id and field_path are required' }, 400);
+      }
+      if (!/^(cultural_verticals|business_verticals)\.[a-z0-9_]+$/.test(field_path)) {
+        return json({ error: 'field_path must be cultural_verticals.<id> or business_verticals.<id>' }, 400);
+      }
+      const cv = Number(corrected_value);
+      if (!Number.isInteger(cv) || cv < 0 || cv > 5) {
+        return json({ error: 'corrected_value must be an integer 0–5' }, 400);
+      }
+      try {
+        let base = JSON.parse((await env.CLUSTER_KV.get(GRAPH_KEY)) || 'null');
+        if (!base) base = buildGraphFromSeed(seedData);
+        const node = base.nodes.find((n) => n.id === node_id);
+        if (!node) return json({ error: `unknown node_id: ${node_id}` }, 404);
+        const record = makeOverrideRecord(fieldValue(node, field_path), cv, corrected_by, reason);
+        const overlay = JSON.parse((await env.CLUSTER_KV.get(OVERLAY_KEY)) || '{"nodes":[],"links":[]}');
+        if (!overlay.overrides) overlay.overrides = {};
+        if (!overlay.overrides[node_id]) overlay.overrides[node_id] = {};
+        overlay.overrides[node_id][field_path] = record;
+        await env.CLUSTER_KV.put(OVERLAY_KEY, JSON.stringify(overlay));
+        return json({ status: 'ok', node_id, field_path, override: record });
+      } catch (err) {
+        console.error(`[Cluster] Override failed: ${err.message}`);
         return json({ status: 'error', message: err.message }, 500);
       }
     }
