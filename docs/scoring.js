@@ -237,3 +237,21 @@ export function resolvedValue(node, fieldPath) {
 export function isOverridden(node, fieldPath) {
   return !!(node && node.manual_overrides && node.manual_overrides[fieldPath]);
 }
+
+/**
+ * A score object (e.g. cultural_verticals) with manual corrections applied —
+ * used so an entity's POSITION is derived from corrected values, not just its
+ * panel display. Non-destructive: returns a copy, the node's stored scores are
+ * untouched.
+ */
+export function resolvedScores(node, objectName) {
+  const scores = { ...((node && node[objectName]) || {}) };
+  const overrides = node && node.manual_overrides;
+  if (overrides) {
+    const prefix = objectName + '.';
+    for (const fp of Object.keys(overrides)) {
+      if (fp.startsWith(prefix)) scores[fp.slice(prefix.length)] = overrides[fp].corrected_value;
+    }
+  }
+  return scores;
+}

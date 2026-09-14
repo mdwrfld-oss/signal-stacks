@@ -22,9 +22,9 @@
         "-c",
         "cluster-study/wrangler.jsonc",
         "--port",
-        "8787"
+        "8788"
       ],
-      "port": 8787
+      "port": 8788
     }
   ]
 }

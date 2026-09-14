@@ -26,6 +26,7 @@ import {
   signalGlowFraction,
   fieldValue,
   resolvedValue,
+  resolvedScores,
   isOverridden,
 } from './scoring.js';
 import {
@@ -263,7 +264,9 @@ function prepare(graph) {
       business,
       // Gamma-sharpened for spacing (see CULT_SCORE_GAMMA) — dominant wells
       // dominate position, so near-tied profiles stop stacking at the center.
-      cultural: normalizeScores(n.cultural_verticals, CULTURAL_VERTICALS, CULT_SCORE_GAMMA),
+      // Resolved scores so a manual correction moves the entity's honest
+      // Cultural-Landscape position, not just its panel display.
+      cultural: normalizeScores(resolvedScores(n, 'cultural_verticals'), CULTURAL_VERTICALS, CULT_SCORE_GAMMA),
     };
     // A hub only appears on the Business Landscape once it has business_verticals
     // to position it. As of the full-scoring data pass every hub is scored, so
@@ -667,6 +670,43 @@ function render(graph) {
     business: settleMap('business', false),
     cultural: settleMap('cultural', true),
   };
+
+  // A manual correction is only honest if the entity's Cultural-Landscape
+  // position moves with it. Recompute JUST this entity's own weighted position
+  // from its (override-resolved) scores — no full re-layout. Business position
+  // is arbitrary by design, so it's untouched. A corrected child also nudges
+  // its family's parent centroid, since the parent's position derives from it.
+  function recomputeEntityCultural(n) {
+    if (!n || n.type === 'parent') return;
+    n.weights.cultural = normalizeScores(resolvedScores(n, 'cultural_verticals'), CULTURAL_VERTICALS, CULT_SCORE_GAMMA);
+    const p = weightedPosition(n.weights.cultural, culturalAnchors);
+    if (!p) return;
+    const live = state.map === 'cultural';
+    const apply = (id, x, y) => {
+      const snap = mapPositions.cultural.get(id);
+      if (snap) {
+        snap.x = x;
+        snap.y = y;
+      }
+      const m = state.nodesById.get(id);
+      if (m && live) {
+        m.x = m.homeX = x;
+        m.y = m.homeY = y;
+        if (snap && snap.pinned) {
+          m.fx = x;
+          m.fy = y;
+        }
+      }
+    };
+    apply(n.id, p.x, p.y);
+    if (n.parent) {
+      const fam = families.find((f) => f.parent.id === n.parent);
+      const c = fam && centroid(fam.children.map((ch) => mapPositions.cultural.get(ch.id)));
+      if (c) apply(fam.parent.id, c.x, c.y);
+    }
+    if (live) simulation.alpha(0.3).restart();
+  }
+  state.recomputeCultural = recomputeEntityCultural;
 
   function applyMap(mapId) {
     state.map = mapId;
@@ -1657,12 +1697,11 @@ function radarSpikeBurst(d) {
     parts.push(
       `<line class="radar-axis" x1="${cx0}" y1="${cy0}" x2="${(cx0 + cos * maxR).toFixed(1)}" y2="${(cy0 + sin * maxR).toFixed(1)}" />`
     );
-    // Spike length reads the DISPLAYED (override-resolved) value; a corrected
-    // spike renders distinctly + gets an apex dot so a human-checked score reads
-    // apart from an automated one at a glance.
+    // Spike length reads the DISPLAYED (override-resolved) value — a correction
+    // still shortens/lengthens the spike, but it renders identically to any
+    // other spike (no special marker: corrections aren't a highlighted feature).
     const fp = `cultural_verticals.${v.id}`;
     const s = Math.max(0, Math.min(5, Number(resolvedValue(d, fp)) || 0));
-    const verified = isOverridden(d, fp);
     if (s > 0) {
       const r = (s / 5) * maxR;
       const apexX = cx0 + cos * r;
@@ -1671,11 +1710,8 @@ function radarSpikeBurst(d) {
       const px = -sin * bw;
       const py = cos * bw;
       parts.push(
-        `<path class="radar-spike${verified ? ' radar-spike--verified' : ''}" d="M${(cx0 + px).toFixed(1)},${(cy0 + py).toFixed(1)} L${apexX.toFixed(1)},${apexY.toFixed(1)} L${(cx0 - px).toFixed(1)},${(cy0 - py).toFixed(1)} Z" />`
+        `<path class="radar-spike" d="M${(cx0 + px).toFixed(1)},${(cy0 + py).toFixed(1)} L${apexX.toFixed(1)},${apexY.toFixed(1)} L${(cx0 - px).toFixed(1)},${(cy0 - py).toFixed(1)} Z" />`
       );
-      if (verified) {
-        parts.push(`<circle class="radar-verified-dot" cx="${apexX.toFixed(1)}" cy="${apexY.toFixed(1)}" r="3.2" />`);
-      }
     }
     const lx = cx0 + cos * (maxR + 11);
     const ly = cy0 + sin * (maxR + 11);
@@ -1707,7 +1743,7 @@ function culturalAccordion(d) {
     const subs = RUBRIC_SUBFACTORS.map(
       (r) => `<div class="rubric-row"><span>${esc(r)}</span><span class="pending">pending</span></div>`
     ).join('');
-    return `<div class="cult-row-wrap"><div class="cult-row-head"><details class="cult-row"><summary><span class="cult-name">${esc(v.label)}</span><span class="cult-score">${s}/5${overrideBadge(d, fp)}</span></summary><div class="rubric">${subs}<p class="rel-note">Populates once the Cultural Affinity Processor is live.</p></div></details>${editButton(fp)}</div>${overrideForm(d, fp)}</div>`;
+    return `<div class="cult-row-wrap"><div class="cult-row-head"><details class="cult-row"><summary><span class="cult-name">${esc(v.label)}</span><span class="cult-score"${overrideTitleAttr(d, fp)}>${s}/5</span></summary><div class="rubric">${subs}<p class="rel-note">Populates once the Cultural Affinity Processor is live.</p></div></details>${editButton(fp)}</div>${overrideForm(d, fp)}</div>`;
   }).join('');
   return `<h3>Cultural categories</h3><div class="accordion">${rows}</div>`;
 }
@@ -1720,7 +1756,7 @@ function businessProfile(d) {
     .map((v) => {
       const fp = `business_verticals.${v.id}`;
       const s = Math.max(0, Math.min(5, val(v.id)));
-      return `<div class="score-row-wrap"><div class="score-row"><span class="score-name">${esc(v.label)} — <strong>${s}</strong>/5${overrideBadge(d, fp)}</span>${editButton(fp)}</div>${overrideForm(d, fp)}</div>`;
+      return `<div class="score-row-wrap"><div class="score-row"><span class="score-name"${overrideTitleAttr(d, fp)}>${esc(v.label)} — <strong>${s}</strong>/5</span>${editButton(fp)}</div>${overrideForm(d, fp)}</div>`;
     })
     .join('');
   return `<h3>Business profile (0–5)</h3><div class="score-list">${rows}</div>`;
@@ -1728,17 +1764,19 @@ function businessProfile(d) {
 
 /* ---- manual override (human correction) affordances in the panel ---- */
 
-// Reads as HIGHER confidence than an automated score — this value was checked
-// by a person. Tooltip carries the full provenance (who/when/original/reason).
-function overrideBadge(d, fieldPath) {
+// No always-visible marker — corrections are rare exceptions, not a highlighted
+// feature, and a badge would imply everything unbadged is less trustworthy.
+// Provenance stays answerable on hover (this title) and on click (the edit form
+// shows researched value + reason), so "why does this say 2 instead of 4?" is
+// still answerable — just not surfaced. Returns a title-attribute fragment.
+function overrideTitleAttr(d, fieldPath) {
   if (!isOverridden(d, fieldPath)) return '';
   const ov = d.manual_overrides[fieldPath];
-  const who = ov.corrected_by ? esc(ov.corrected_by) : 'a team member';
-  const when = ov.corrected_date ? esc(String(ov.corrected_date).slice(0, 10)) : '';
+  const who = ov.corrected_by || 'a team member';
+  const when = ov.corrected_date ? String(ov.corrected_date).slice(0, 10) : '';
   const orig = ov.original_value ?? '—';
-  const reason = ov.reason ? ` — “${esc(ov.reason)}”` : '';
-  const title = `Manually verified by ${who}${when ? ' on ' + when : ''} · researched value was ${esc(orig)}/5${reason}`;
-  return ` <span class="verified-badge" title="${title}">✓ Verified</span>`;
+  const reason = ov.reason ? ` — ${ov.reason}` : '';
+  return ` title="${esc(`Corrected to ${ov.corrected_value} from ${orig} by ${who}${when ? ' on ' + when : ''}${reason}`)}"`;
 }
 
 function editButton(fieldPath) {
@@ -1831,7 +1869,10 @@ async function submitOverride(d, form) {
     if (!resp.ok) throw new Error(data.error || data.message || `HTTP ${resp.status}`);
     if (!d.manual_overrides) d.manual_overrides = {};
     d.manual_overrides[fieldPath] = data.override; // the persisted record
-    showPanel(d); // re-render with the correction + badge live
+    // A cultural correction must move the entity's Cultural-Landscape position,
+    // not just its panel/radar — otherwise the map and panel disagree.
+    if (fieldPath.startsWith('cultural_verticals.')) state.recomputeCultural?.(d);
+    showPanel(d); // re-render with the correction live
   } catch (err) {
     status.textContent = `Error: ${err.message}`;
     if (/HTTP 401/.test(err.message)) localStorage.removeItem('cluster_secret');

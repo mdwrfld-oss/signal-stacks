@@ -509,22 +509,6 @@ body { display: flex; flex-direction: column; }
 }
 .override-edit:hover { background: rgba(139, 125, 216, 0.18); }
 
-/* A corrected value reads as HIGHER confidence — checked by a person. Green,
-   with a check, distinct from the automated white/gray/purple scores. */
-.verified-badge {
-  display: inline-block;
-  margin-left: 5px;
-  padding: 1px 6px;
-  border-radius: 9px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  color: #0b1f14;
-  background: #4fd08a;
-  border: 1px solid #66e3a0;
-  cursor: help;
-  vertical-align: middle;
-}
 
 .override-form {
   margin: 4px 0 10px;
@@ -567,11 +551,6 @@ body { display: flex; flex-direction: column; }
 }
 .override-status:empty { display: none; }
 .override-status { margin: 7px 0 0; }
-
-/* Corrected radar spike: green (verified) instead of the yellow research spike,
-   with a dot at the apex so it reads apart at a glance. */
-.radar-spike--verified { fill: rgba(79, 208, 138, 0.8); stroke: #4fd08a; }
-.radar-verified-dot { fill: #66e3a0; stroke: #0b1f14; stroke-width: 0.6; }
 
 /* II.14 ghost mode — dim duplicate at prior position + fading connector. */
 .ghost-node { fill: rgba(154, 146, 184, 0.28); stroke: none; }
