@@ -2897,6 +2897,16 @@
           "rationale": "Kept: specific real activity in notes — 25-influencer Instagram campaign, wellness-creator relationships (Jen Selter)."
         }
       },
+      "manual_overrides": {
+        "cultural_verticals.sports": {
+          "original_value": 3,
+          "corrected_value": 1,
+          "corrected_by": "CAP manual review",
+          "corrected_date": "2026-08-01",
+          "reason": "Web-verified: Carli Lloyd brand-ambassador deal is real but from 2016 (Rio Olympics era), not the long-running/current relationship onboarding implied; the claimed Rose Lavelle activation could not be verified (likely hallucinated). Rests on one decade-old deal — lowered from 3 to 1.",
+          "automation_may_override": false
+        }
+      },
       "business_verticals": {
         "food_beverage": 5,
         "automotive_transportation": 1,
@@ -5058,6 +5068,16 @@
           "basis": "manual_review_corrected",
           "date": "2026-08-01",
           "rationale": "Web-verified: 2022 NCAA March Madness 'official razor' sponsorship + Drew Timme NIL deal are REAL but both one-off 2022 activations; LA Thieves esports and a 2025 NIL program could NOT be verified. A single dated campaign is not a 'core strategic pillar' — lowered from 4 to 2 (minor/historic real activity)."
+        }
+      },
+      "manual_overrides": {
+        "cultural_verticals.sports": {
+          "original_value": 4,
+          "corrected_value": 2,
+          "corrected_by": "CAP manual review",
+          "corrected_date": "2026-08-01",
+          "reason": "Web-verified: 2022 NCAA March Madness 'official razor' sponsorship + Drew Timme NIL deal are real but both one-off 2022 activations; LA Thieves esports and a 2025 NIL program could not be verified. A single dated campaign is not a core strategic pillar — lowered from 4 to 2.",
+          "automation_may_override": false
         }
       },
       "business_verticals": {
